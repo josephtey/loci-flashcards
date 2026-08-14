@@ -69,11 +69,13 @@ prompt you keep forgetting is a broken prompt, not a broken memory.
 The home page leads with today, not the deck total — a total only goes up when you write more, so
 it reads as debt however much work you do.
 
-**5 new cards a day, 40 reviews.** A card needs roughly eight to ten reviews to reach multi-year
-stability, so steady-state review load is about 8–10× the daily new-card rate, permanently. Five
-new a day settles at forty-odd reviews and ten to fifteen minutes; ten a day settles at eighty to
-a hundred, which is where people quit. The 40 is also a cap: on the day you return to a backlog it
-time-boxes the dig instead of asking for three hundred cards.
+**20 new cards a day, 50 reviews.** A card needs roughly eight to ten reviews to reach multi-year
+stability, so steady-state review load is about 8–10× the daily new-card rate, permanently — which
+makes 20 an ambitious intake against a 50-review ceiling. The trade is deliberate: the deck is fed
+by one person's writing, so clearing the queue after a sync matters more than holding the two
+numbers in balance. The 50 is a cap rather than a quota — on the day you return to a backlog it
+time-boxes the dig instead of asking for three hundred cards. Both live in `src/lib/goals.ts`; if
+due counts climb week over week, lower the intake.
 
 The streak counts **days that ended with nothing owed**, not days with any activity. It's
 reconstructed from history — each review carries the card's prior due date, so every stretch where

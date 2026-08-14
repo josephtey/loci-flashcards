@@ -2,16 +2,16 @@
  * What a day of this actually costs.
  *
  * A card needs roughly eight to ten reviews to reach multi-year stability, spread across its
- * life. So the steady-state review load is about 8–10× the daily new-card rate — permanently.
- * Five new a day settles at forty-odd reviews a day, ten or fifteen minutes; ten new a day
- * settles at eighty to a hundred, which is where people quit. The number that matters is the one
- * you can hit on a bad day.
+ * life, so the steady-state review load lands at about 8–10× the daily new-card rate —
+ * permanently. Twenty new a day is therefore an ambitious setting: left to run, it converges on
+ * something like a hundred and fifty reviews a day, well past the cap below.
  *
- * Anki's default of twenty new a day is calibrated for a medical student grinding a twenty-
- * thousand-card premade deck against a fixed exam date. This deck is Joseph's own writing, and
- * the binding constraint is how much he writes, not how much he can absorb.
+ * That's a deliberate choice, not an oversight. The deck is fed by Joseph's own writing, so the
+ * real constraint is how much he writes rather than how much he can absorb, and a target that
+ * clears the whole backlog after a sync beats one that leaves new cards queueing for a fortnight.
+ * If due counts start climbing week over week, this is the number to lower.
  */
-export const DAILY_NEW = 5;
+export const DAILY_NEW = 20;
 
 /**
  * The most reviews a day should ever ask for.
@@ -19,8 +19,9 @@ export const DAILY_NEW = 5;
  * Clearing what's due is the real obligation, and on an ordinary day that's well under this. The
  * cap exists for the day you come back to a backlog: grinding three hundred cards is how a deck
  * gets abandoned, and the cards left behind decay by single-digit percentages while they wait.
+ * Fifty is about twenty minutes at eight seconds a card.
  */
-export const DAILY_REVIEW_CAP = 40;
+export const DAILY_REVIEW_CAP = 50;
 
 export interface DayPlan {
   newGoal: number;
