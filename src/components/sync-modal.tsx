@@ -60,7 +60,7 @@ interface Run {
   notes: RunNote[];
 }
 
-type Phase = 'loading' | 'diffs' | 'running' | 'results' | 'error';
+type Phase = 'loading' | 'diffs' | 'running' | 'results' | 'error' | 'failed';
 
 /** The folders to start on. Everything else in the vault is opt-in, one chip at a time. */
 const DEFAULT_FOLDERS = ['Biotech + Pharma', 'Biology'];
@@ -100,6 +100,9 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   const [openRunNote, setOpenRunNote] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [scanLog, setScanLog] = useState<string | null>(null);
+  /** When this session's run was started, so results can't come from an older one. */
+  const [startedAt, setStartedAt] = useState<string | null>(null);
 
   const loadDiffs = useCallback(async (only: string[]) => {
     setPhase('loading');
@@ -167,13 +170,24 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
     const poll = setInterval(async () => {
       try {
         const res = await fetch('/api/scan');
-        const s = (await res.json()) as { running: boolean };
+        const s = (await res.json()) as { running: boolean; log: string | null };
         if (!s.running && Date.now() - started > 6000) {
-          const r = await fetch('/api/sync/result');
-          const d = (await r.json()) as { notes: ResultNote[] };
-          setNotes(d.notes);
+          const qs = startedAt ? `?since=${encodeURIComponent(startedAt)}` : '';
+          const r = await fetch(`/api/sync/result${qs}`);
+          const d = (await r.json()) as {
+            notes: ResultNote[];
+            failed?: boolean;
+            error?: string | null;
+          };
           setRuns(null); // history has a new entry in it now
-          setPhase('results');
+          if (d.failed) {
+            setError(d.error ?? 'The scan did not finish.');
+            setScanLog(s.log);
+            setPhase('failed');
+          } else {
+            setNotes(d.notes);
+            setPhase('results');
+          }
         }
       } catch {
         /* a dev-server reload mid-scan is not worth surfacing */
@@ -186,7 +200,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
     // `elapsed` seeds the clock when an in-flight run is adopted; re-running on every tick would
     // reset it, so it is deliberately not a dependency.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, startedAt]);
 
   // The scan writes as it goes, so leaving is not destructive — but it is the only place the
   // summary is shown, so warn before it disappears.
@@ -200,26 +214,33 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   const generate = useCallback(async () => {
     setPhase('running');
     setElapsed(0);
-    await fetch('/api/scan', {
+    setStartedAt(new Date().toISOString());
+    const res = await fetch('/api/scan', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ only: scope }),
     });
+    if (!res.ok) {
+      const d = (await res.json().catch(() => ({}))) as { error?: string; reason?: string };
+      setError(d.error ?? d.reason ?? `The scanner could not be started (${res.status}).`);
+      setPhase('failed');
+    }
   }, [scope]);
 
   const cancel = useCallback(async () => {
     setCancelling(true);
     try {
       await fetch('/api/scan', { method: 'DELETE' });
-      const r = await fetch('/api/sync/result');
-      const d = (await r.json()) as { notes: ResultNote[] };
-      setNotes(d.notes);
+      const qs = startedAt ? `?since=${encodeURIComponent(startedAt)}` : '';
+      const r = await fetch(`/api/sync/result${qs}`);
+      const d = (await r.json()) as { notes: ResultNote[]; failed?: boolean };
+      setNotes(d.notes ?? []);
       setRuns(null);
       setPhase('results');
     } finally {
       setCancelling(false);
     }
-  }, []);
+  }, [startedAt]);
 
   const toggleFolder = useCallback(
     (name: string) => {
@@ -241,7 +262,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
         <div className="flex shrink-0 items-baseline justify-between gap-4">
           <div>
             <h2 className="text-lg font-light">
-              {phase === 'results' ? 'Cards added' : 'Sync with Obsidian'}
+              {phase === 'results' ? 'Cards added' : phase === 'failed' ? 'Sync failed' : 'Sync with Obsidian'}
             </h2>
             <p className="mt-1 text-xs text-ink-3">
               {phase === 'loading' && 'Reading the vault…'}
@@ -252,6 +273,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
                   : `Nothing has changed. ${meta.scanned} notes checked.`)}
               {phase === 'diffs' && tab === 'history' && 'Every run, and what it read'}
               {phase === 'running' && 'Reading each change and writing cards'}
+              {phase === 'failed' && 'No cards were written'}
               {phase === 'results' &&
                 (totalCards
                   ? `${totalCards} card${totalCards === 1 ? '' : 's'} across ${notes.length} note${notes.length === 1 ? '' : 's'}`
@@ -310,6 +332,26 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
         {/* ── body ───────────────────────────────────────────────────────── */}
         <div className="card-quiet mt-4 min-h-0 flex-1 overflow-y-auto">
           {phase === 'error' && <p className="p-6 text-sm text-ink-2">{error}</p>}
+
+          {phase === 'failed' && (
+            <div className="p-5 sm:p-6">
+              <p className="text-sm leading-relaxed text-mem-fresh">{error}</p>
+              <p className="mt-3 text-xs leading-relaxed text-ink-3">
+                Nothing was written, so nothing is half-done — the notes it never reached are still
+                pending and the next sync will pick them up.
+              </p>
+              {scanLog && (
+                <>
+                  <p className="mt-5 font-mono text-[0.5625rem] uppercase tracking-wider text-ink-4">
+                    Scanner output
+                  </p>
+                  <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded border border-ink-4 p-3 font-mono text-[0.625rem] leading-relaxed text-ink-3">
+                    {scanLog}
+                  </pre>
+                </>
+              )}
+            </div>
+          )}
 
           {phase === 'loading' && (
             <p className="p-6 text-sm text-ink-3">Comparing the vault against the last scan…</p>

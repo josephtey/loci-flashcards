@@ -92,28 +92,43 @@ async function main() {
     return;
   }
 
-  const { data: run, error: runError } = await db
+  const core = {
+    trigger: args.has('--cron') ? 'cron' : 'manual',
+    notes_scanned: sync.scanned,
+    notes_new: sync.changes.filter((c) => c.kind === 'new').length,
+    notes_changed: sync.changes.filter((c) => c.kind === 'changed').length,
+    notes_deleted: sync.deleted.length,
+    model: process.env.LOCI_MODEL ?? 'claude-sonnet-5',
+  };
+
+  // pid/scope/request arrived with migration 0005 and are pure bookkeeping. If the migration
+  // hasn't been run, the insert fails and the whole scan dies before writing a single card — an
+  // expensive way to learn that a column for a process id is missing. Drop the extras and carry
+  // on; the run still produces cards, it just can't be cancelled from the app.
+  let { data: run, error: runError } = await db
     .from('scan_runs')
     .insert({
-      trigger: args.has('--cron') ? 'cron' : 'manual',
-      notes_scanned: sync.scanned,
-      notes_new: sync.changes.filter((c) => c.kind === 'new').length,
-      notes_changed: sync.changes.filter((c) => c.kind === 'changed').length,
-      notes_deleted: sync.deleted.length,
-      model: process.env.LOCI_MODEL ?? 'claude-sonnet-5',
+      ...core,
       pid: process.pid,
       scope: only?.length ? only.join(', ') : paths?.length ? `${paths.length} notes` : null,
       request: request ?? null,
     })
     .select('id')
     .single();
-  if (runError) throw new Error(`Failed to open scan run: ${runError.message}`);
+
+  if (runError?.message?.includes('column')) {
+    log(`${YELLOW}scan_runs is missing columns from migration 0005 — continuing without them.`);
+    log(`${YELLOW}Apply supabase/migrations/0005_generation_log.sql for the log and cancel button.${RESET}`);
+    ({ data: run, error: runError } = await db.from('scan_runs').insert(core).select('id').single());
+  }
+  if (runError || !run) throw new Error(`Failed to open scan run: ${runError?.message ?? 'no row returned'}`);
+  const runId = run.id as string;
 
   log();
   log(`${DIM}extracting…${RESET}`);
 
   try {
-    const summary = await extract(sync, run.id as string, request);
+    const summary = await extract(sync, runId, request);
 
     await db
       .from('scan_runs')
@@ -125,7 +140,7 @@ async function main() {
         input_tokens: summary.usage.input + summary.usage.cacheWrite + summary.usage.cacheRead,
         output_tokens: summary.usage.output,
       })
-      .eq('id', run.id as string);
+      .eq('id', runId);
 
     log();
     for (const n of summary.perNote) {
@@ -167,7 +182,7 @@ async function main() {
         status: 'failed',
         error: err instanceof Error ? err.message : String(err),
       })
-      .eq('id', run.id as string);
+      .eq('id', runId);
     throw err;
   }
 }

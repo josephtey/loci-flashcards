@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process';
+import { openSync, readFileSync, statSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { NextResponse } from 'next/server';
 import { vaultStatus } from '@/lib/environment';
 import { supabase } from '@/lib/supabase';
@@ -19,6 +22,27 @@ import { supabase } from '@/lib/supabase';
 
 let spawned: { pid: number; startedAt: number } | null = null;
 
+/**
+ * Where the scanner's own output goes.
+ *
+ * It used to go to `stdio: 'ignore'`, which meant a scan that died on its first database call
+ * looked exactly like a scan that found nothing: no row, no cards, no error, no trace. A file
+ * rather than an in-memory buffer because the scan outlives the request that started it, and
+ * often the dev server too.
+ */
+const LOG_FILE = path.join(tmpdir(), 'loci-scan.log');
+
+/** The tail of the last scan's output, for when something went wrong. */
+function scanLog(maxBytes = 4000): string | null {
+  try {
+    const size = statSync(LOG_FILE).size;
+    const text = readFileSync(LOG_FILE, 'utf8');
+    return size > maxBytes ? text.slice(-maxBytes) : text;
+  } catch {
+    return null;
+  }
+}
+
 /** Is this pid still a live process? Signal 0 tests for existence without delivering anything. */
 function alive(pid: number | null | undefined): boolean {
   if (!pid) return false;
@@ -32,28 +56,33 @@ function alive(pid: number | null | undefined): boolean {
 
 interface RunRow {
   id: string;
-  pid: number | null;
+  /** Present only once migration 0005 has been applied. */
+  pid?: number | null;
   status: string;
   started_at: string;
   finished_at: string | null;
-  scope: string | null;
-  request: string | null;
+  scope?: string | null;
+  request?: string | null;
   notes_changed: number | null;
   targets_proposed: number | null;
   cards_proposed: number | null;
   error: string | null;
 }
 
+const CORE_COLUMNS =
+  'id, status, started_at, finished_at, notes_changed, targets_proposed, cards_proposed, error';
+
 async function latestRun(): Promise<RunRow | null> {
-  const { data } = await supabase()
-    .from('scan_runs')
-    .select(
-      'id, pid, status, started_at, finished_at, scope, request, notes_changed, ' +
-        'targets_proposed, cards_proposed, error',
-    )
-    .order('started_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const db = supabase();
+  const newest = (cols: string) =>
+    db.from('scan_runs').select(cols).order('started_at', { ascending: false }).limit(1).maybeSingle();
+
+  // Selecting a column that doesn't exist fails the whole query, so before migration 0005 this
+  // returned null for every run — the app couldn't see a scan in flight, let alone stop one.
+  const first = await newest(`${CORE_COLUMNS}, pid, scope, request`);
+  let data = first.data;
+  if (first.error?.message?.includes('column')) ({ data } = await newest(CORE_COLUMNS));
+
   return (data as RunRow | null) ?? null;
 }
 
@@ -91,10 +120,12 @@ export async function POST(req: Request) {
   if (body.paths?.length) args.push('--paths', body.paths.join(','));
   if (body.request?.trim()) args.push('--request', body.request.trim());
 
+  // Truncate and reopen per run, so the log always describes the run you just started.
+  const out = openSync(LOG_FILE, 'w');
   const child = spawn('npm', args, {
     cwd: process.cwd(),
     detached: true,
-    stdio: 'ignore',
+    stdio: ['ignore', out, out],
     env: process.env,
   });
 
@@ -143,6 +174,7 @@ export async function GET() {
       : null,
     current: running ? run : null,
     lastRun: stale ? { ...run, status: 'cancelled' } : run,
+    log: running ? null : scanLog(),
     pendingTargets: pending ?? 0,
   });
 }
