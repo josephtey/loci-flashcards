@@ -9,7 +9,7 @@ export default async function ReviewPage() {
 
   if (!cards.length) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center px-8">
+      <main className="flex min-h-dvh flex-col items-center justify-center px-6">
         <p className="rise text-ink-3">Nothing due.</p>
         <Link href="/" className="mt-8 text-sm text-ink-3 transition-colors hover:text-ink">
           Home

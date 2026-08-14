@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { NextResponse } from 'next/server';
+import { vaultStatus } from '@/lib/environment';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -57,6 +58,11 @@ async function latestRun(): Promise<RunRow | null> {
 }
 
 export async function POST(req: Request) {
+  const vault = await vaultStatus();
+  if (!vault.available) {
+    return NextResponse.json({ error: vault.reason }, { status: 503 });
+  }
+
   const current = await latestRun();
   if (current?.status === 'running' && alive(current.pid)) {
     return NextResponse.json({ started: false, reason: 'already running' }, { status: 409 });

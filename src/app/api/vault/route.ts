@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { vaultStatus } from '@/lib/environment';
 import { supabase } from '@/lib/supabase';
 import { scanVault } from '@/scanner/vault';
 
@@ -24,6 +25,11 @@ export interface VaultNote {
  * barely touched", and a bare file tree can't.
  */
 export async function GET() {
+  const vault = await vaultStatus();
+  if (!vault.available) {
+    return NextResponse.json({ error: vault.reason }, { status: 503 });
+  }
+
   const db = supabase();
   const { notes, unreadable } = await scanVault();
 

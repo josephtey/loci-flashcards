@@ -12,7 +12,7 @@ export function HomeButton() {
     <Link
       href="/"
       aria-label="Home"
-      className="group mb-3 inline-flex items-center gap-1.5 text-ink-4 transition-colors hover:text-ink-2"
+      className="group -ml-2 mb-2 inline-flex items-center gap-1.5 p-2 text-ink-4 transition-colors hover:text-ink-2"
     >
       <span className="text-xs">←</span>
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">

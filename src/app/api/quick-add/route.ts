@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { NextResponse } from 'next/server';
+import { vaultStatus } from '@/lib/environment';
 import { readConfig } from '@/lib/prompt-store';
 import { zQuickBatch, type QuickCard } from '@/lib/types';
 import { QUICK_ADD_SYSTEM } from '@/scanner/prompts';
@@ -19,6 +20,11 @@ export const maxDuration = 300;
  * whole reason this path can skip the judge.
  */
 export async function POST(req: Request) {
+  const vault = await vaultStatus();
+  if (!vault.available) {
+    return NextResponse.json({ error: vault.reason }, { status: 503 });
+  }
+
   const body = (await req.json()) as { paths?: string[]; request?: string; count?: number };
 
   if (!body.paths?.length) {

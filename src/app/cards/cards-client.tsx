@@ -48,7 +48,13 @@ function when(iso: string | null): string {
   return `${(days / 365).toFixed(1)}y`;
 }
 
-export function CardsClient({ notes }: { notes: BrowseNote[] }) {
+export function CardsClient({
+  notes,
+  vaultAvailable,
+}: {
+  notes: BrowseNote[];
+  vaultAvailable: boolean;
+}) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [tierFilter, setTierFilter] = useState<TierKey | null>(null);
@@ -183,7 +189,7 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
 
 
   return (
-    <main className="mx-auto flex h-screen max-w-5xl flex-col px-8 py-8">
+    <main className="safe-b mx-auto flex h-dvh max-w-5xl flex-col px-5 py-6 sm:px-8 sm:py-8">
       <header className="flex shrink-0 flex-wrap items-baseline justify-between gap-4">
         <div>
           <HomeButton />
@@ -202,7 +208,13 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
           </button>
           <Link
             href="/add"
-            className="flex items-center gap-2 rounded border border-ink-4 px-3 py-1.5 text-ink-3 transition-colors hover:border-ink-2 hover:text-ink"
+            aria-disabled={!vaultAvailable}
+            title={vaultAvailable ? undefined : 'Needs the Obsidian vault — run locally'}
+            className={`flex items-center gap-2 rounded border px-3 py-1.5 transition-colors ${
+              vaultAvailable
+                ? 'border-ink-4 text-ink-3 hover:border-ink-2 hover:text-ink'
+                : 'pointer-events-none border-ink-4/50 text-ink-4'
+            }`}
           >
             Draft with AI
             <span className="rounded-sm border border-ink-4 px-1 py-px font-mono text-[0.5625rem] uppercase tracking-wider text-ink-4">
@@ -226,7 +238,7 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
             <button
               key={k}
               onClick={() => setTierFilter(on ? null : k)}
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.6875rem] transition-colors ${
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 sm:py-1 text-[0.6875rem] transition-colors ${
                 on ? 'border-ink-2 text-ink' : 'border-ink-4 text-ink-3 hover:text-ink-2'
               }`}
             >
@@ -263,7 +275,7 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
                         return n;
                       })
                     }
-                    className="group flex flex-1 items-baseline gap-2 text-left"
+                    className="group flex flex-1 items-baseline gap-2 py-1.5 text-left sm:py-0"
                   >
                     <span className="font-mono text-[0.625rem] text-ink-4">{open ? '−' : '+'}</span>
                     <span className="text-xs text-ink-2 group-hover:text-ink">{note.title}</span>
@@ -277,7 +289,7 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
                   <button
                     onClick={() => openCreate(note.path ? note : null)}
                     title="Write a card for this note"
-                    className="font-mono text-[0.625rem] text-ink-4 hover:text-ink"
+                    className="-my-1.5 px-1 py-1.5 font-mono text-[0.625rem] text-ink-4 hover:text-ink"
                   >
                     + card
                   </button>
@@ -295,11 +307,11 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
                       <div
                         key={c.id}
                         onClick={() => openEdit(c, note)}
-                        className="group flex cursor-pointer items-baseline gap-3 border-b border-ink-4/30 px-4 py-2.5 hover:bg-surface"
+                        className="group flex cursor-pointer items-baseline gap-3 border-b border-ink-4/30 px-3 py-3 hover:bg-surface active:bg-surface sm:px-4 sm:py-2.5"
                       >
-                        <span className="flex w-24 shrink-0 items-center gap-1.5">
+                        <span className="flex w-4 shrink-0 items-center gap-1.5 sm:w-24">
                           <span className={`inline-block h-1.5 w-1.5 rounded-full ${tier.dot}`} />
-                          <span className={`font-mono text-[0.625rem] ${tier.color}`}>
+                          <span className={`hidden font-mono text-[0.625rem] sm:inline ${tier.color}`}>
                             {tier.label}
                           </span>
                         </span>
@@ -314,7 +326,7 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
                           {c.type !== 'qa' && ` · ${c.type}`}
                         </span>
                         <span
-                          className="w-14 shrink-0 text-right font-mono text-[0.625rem] tabular-nums text-ink-4"
+                          className="hidden w-14 shrink-0 text-right font-mono text-[0.625rem] tabular-nums text-ink-4 xs:block"
                           title={`${c.reps} reviews · ${c.lapses} lapses${c.stability ? ` · stability ${Math.round(c.stability)}d` : ''}`}
                         >
                           {c.status === 'active' ? when(c.due) : '—'}
@@ -322,8 +334,8 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
 
                         {/* Both actions live on the row and appear on hover. Deleting from here
                             takes a confirm, since the row is one click away from being opened. */}
-                        <span className="flex w-16 shrink-0 items-baseline justify-end gap-2.5 font-mono text-[0.625rem] text-ink-4 opacity-0 transition-opacity group-hover:opacity-100">
-                          <span>edit</span>
+                        <span className="flex w-11 shrink-0 items-baseline justify-end gap-2.5 font-mono text-[0.625rem] text-ink-4 transition-opacity sm:w-16 sm:opacity-0 sm:group-hover:opacity-100">
+                          <span className="hidden sm:inline">edit</span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -331,7 +343,7 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
                             }}
                             disabled={busy}
                             aria-label="Delete card"
-                            className="transition-colors hover:text-mem-fresh disabled:opacity-40"
+                            className="-my-2 px-1.5 py-2 transition-colors hover:text-mem-fresh disabled:opacity-40"
                           >
                             ✕
                           </button>
@@ -355,7 +367,7 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
       {modal && (
         <div
           onClick={() => setModal(null)}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 px-6 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-10"
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -470,7 +482,7 @@ export function CardsClient({ notes }: { notes: BrowseNote[] }) {
       {pendingDelete && (
         <div
           onClick={() => setPendingDelete(null)}
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-bg/95 px-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-bg/95 px-4 backdrop-blur-sm sm:px-6"
         >
           <div onClick={(e) => e.stopPropagation()} className="rise w-full max-w-md">
             <p className="text-xs uppercase tracking-[0.18em] text-ink-3">Delete this card?</p>

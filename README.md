@@ -7,6 +7,26 @@ FSRS deck. The design rationale — and the evidence behind each choice — is i
 [`docs/prompt-principles.md`](docs/prompt-principles.md), distilled from Andy Matuschak's notes
 on prompt writing.
 
+![Loci — today's goals and a year of activity](docs/screenshots/home.png)
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/review.png" alt="A card, revealed, with the four grades and the interval each one buys"></td>
+<td width="50%"><img src="docs/screenshots/sync.png" alt="The sync modal: folder filter, the diffs it found, and what it would cost"></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/cards.png" alt="Every card grouped by source note, coloured by memory strength"></td>
+<td><img src="docs/screenshots/methodology.png" alt="The methodology page, where every extraction prompt is editable"></td>
+</tr>
+</table>
+
+<p align="center">
+  <img src="docs/screenshots/m-home.png" width="240" alt="Home on a phone">
+  <img src="docs/screenshots/m-review.png" width="240" alt="Reviewing on a phone">
+  <img src="docs/screenshots/m-cards.png" width="240" alt="The deck on a phone">
+</p>
+
+
 ---
 
 ## How it works
@@ -78,6 +98,10 @@ under `Ever Green Learnings`), then generation with a live clock and a cancel bu
 through what it wrote. A History tab keeps every past run with the diff text it read, so a batch of
 weak cards can be traced back to the edit that produced it.
 
+Everything works on a phone — the card is a large tap target that flips, every keyboard shortcut
+has a button behind it, and `viewport-fit=cover` plus `dvh` units keep the grade buttons clear of
+the home indicator. Add it to the home screen and it opens without browser chrome.
+
 **Every prompt is editable at runtime** from `/methodology` — the files in `prompts/` are read from
 disk per run, not baked into the build. So is the tuning in `prompts/config.json`.
 
@@ -124,9 +148,15 @@ with `--request "<what to extract>"` for a targeted run, `--force` to re-extract
 snapshot (what you want after editing the prompts, when the vault hasn't changed but the output
 would), and `--cron`.
 
-The scanner reads the vault off the local filesystem, so it runs on your machine, not on Vercel.
-The web app deploys anywhere; only `npm run scan` is local — which is also why the sync button
-only works in `next dev`.
+### 4. Hosting
+
+The web app deploys anywhere. The two features that read the vault — **Sync with Obsidian** and
+**Draft with AI** — need the markdown on the same machine, so a hosted copy greys them out and
+says why rather than failing. Reviewing, browsing, editing and writing cards by hand all work
+fine hosted, since they only need Postgres.
+
+Prompts are also read-only when hosted: the filesystem is, so `/methodology` shows them but can't
+save. Edit them in the repo, or locally.
 
 ---
 

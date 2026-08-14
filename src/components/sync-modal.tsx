@@ -235,7 +235,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   const totalWords = changes.reduce((s, c) => s + c.words, 0);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 px-6 py-10 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-10">
       <div className="rise flex h-full w-full max-w-3xl flex-col">
         {/* ── header ─────────────────────────────────────────────────────── */}
         <div className="flex shrink-0 items-baseline justify-between gap-4">
@@ -354,13 +354,13 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
                 <div key={c.path} className="border-b border-ink-4/50 last:border-0">
                   <button
                     onClick={() => setOpen(isOpen ? null : c.path)}
-                    className="group flex w-full items-baseline gap-3 px-5 py-3 text-left hover:bg-white/[0.02]"
+                    className="group flex w-full items-baseline gap-2 px-4 py-3 text-left hover:bg-white/[0.02] active:bg-white/[0.04] sm:gap-3 sm:px-5"
                   >
                     <span className="font-mono text-[0.625rem] text-ink-4">
                       {isOpen ? '−' : '+'}
                     </span>
-                    <span className="text-sm text-ink-2 group-hover:text-ink">{c.title}</span>
-                    <span className="flex-1 truncate font-mono text-[0.625rem] text-ink-4">
+                    <span className="min-w-0 truncate text-sm text-ink-2 group-hover:text-ink">{c.title}</span>
+                    <span className="hidden flex-1 truncate font-mono text-[0.625rem] text-ink-4 sm:block">
                       {c.folder}
                     </span>
                     <span
@@ -368,12 +368,13 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
                     >
                       {c.kind}
                     </span>
-                    <span className="w-20 shrink-0 text-right font-mono text-[0.625rem] tabular-nums text-ink-4">
-                      {c.words} words
+                    <span className="ml-auto w-16 shrink-0 text-right font-mono text-[0.625rem] tabular-nums text-ink-4 sm:w-20">
+                      {c.blocks ? c.words : '—'}
+                      <span className="hidden sm:inline">{c.blocks ? ' words' : ' removals only'}</span>
                     </span>
                   </button>
                   {isOpen && (
-                    <pre className="rise overflow-x-auto whitespace-pre-wrap px-5 pb-4 pl-11 font-mono text-[0.6875rem] leading-relaxed text-ink-3">
+                    <pre className="rise overflow-x-auto whitespace-pre-wrap px-4 pb-4 pl-8 font-mono text-[0.6875rem] leading-relaxed text-ink-3 sm:px-5 sm:pl-11">
                       {c.diff || '(no textual diff — new file)'}
                     </pre>
                   )}
@@ -405,7 +406,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
                 <div key={r.id} className="border-b border-ink-4/50 last:border-0">
                   <button
                     onClick={() => setOpenRun(isOpen ? null : r.id)}
-                    className="group flex w-full items-baseline gap-3 px-5 py-3 text-left hover:bg-white/[0.02]"
+                    className="group flex w-full items-baseline gap-2 px-4 py-3 text-left hover:bg-white/[0.02] active:bg-white/[0.04] sm:gap-3 sm:px-5"
                   >
                     <span className="font-mono text-[0.625rem] text-ink-4">
                       {isOpen ? '−' : '+'}
@@ -413,7 +414,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
                     <span className="w-20 shrink-0 text-sm text-ink-2 group-hover:text-ink">
                       {ago(r.started_at)}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-mono text-[0.625rem] text-ink-4">
+                    <span className="hidden min-w-0 flex-1 truncate font-mono text-[0.625rem] text-ink-4 sm:block">
                       {r.request ? `“${r.request}”` : (r.scope ?? 'whole vault')}
                     </span>
                     <span
@@ -427,13 +428,13 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
                     >
                       {r.status === 'completed' ? '' : r.status}
                     </span>
-                    <span className="w-24 shrink-0 text-right font-mono text-[0.625rem] tabular-nums text-ink-4">
+                    <span className="ml-auto w-16 shrink-0 text-right font-mono text-[0.625rem] tabular-nums text-ink-4 sm:w-24">
                       {r.cards_proposed} card{r.cards_proposed === 1 ? '' : 's'}
                     </span>
                   </button>
 
                   {isOpen && (
-                    <div className="rise pb-3 pl-11 pr-5">
+                    <div className="rise pb-3 pl-8 pr-4 sm:pl-11 sm:pr-5">
                       {r.error && <p className="pb-2 text-xs text-mem-fresh">{r.error}</p>}
                       {!r.notes.length && (
                         <p className="pb-2 text-xs text-ink-4">
@@ -477,7 +478,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
           {phase === 'results' &&
             notes.map((n) => (
               <div key={n.title} className="border-b border-ink-4/50 last:border-0">
-                <div className="sticky top-0 z-10 flex items-baseline gap-3 bg-[#101013]/95 px-5 py-2.5 backdrop-blur">
+                <div className="sticky top-0 z-10 flex items-baseline gap-3 bg-[#101013]/95 px-4 py-2.5 backdrop-blur sm:px-5">
                   <span className="text-xs text-ink-2">{n.title}</span>
                   <span className="flex-1 truncate font-mono text-[0.625rem] text-ink-4">
                     {n.folder}
@@ -486,7 +487,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
                     {n.cards.length}
                   </span>
                 </div>
-                <ul className="space-y-3 p-5">
+                <ul className="space-y-3 p-4 sm:p-5">
                   {n.cards.map((c) => {
                     const q =
                       c.cloze_text && c.type === 'cloze'

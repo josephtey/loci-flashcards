@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ActivityGraph } from '@/components/activity-graph';
 import { HomeSync } from '@/components/home-sync';
+import { vaultStatus } from '@/lib/environment';
 import { dayPlan } from '@/lib/goals';
 import { activity, counts } from '@/lib/queries';
 
@@ -33,7 +34,7 @@ function Goal({
   return (
     <div className={finished ? 'opacity-45' : undefined}>
       <div className="flex items-baseline gap-2">
-        <span className="text-5xl font-light tabular-nums">{finished ? '✓' : left}</span>
+        <span className="text-4xl font-light tabular-nums sm:text-5xl">{finished ? '✓' : left}</span>
         {goal > 0 && (
           <span className="font-mono text-[0.625rem] tabular-nums text-ink-4">
             {done}/{goal}
@@ -56,7 +57,7 @@ function Goal({
 }
 
 export default async function Home() {
-  const [c, a] = await Promise.all([counts(), activity()]);
+  const [c, a, vault] = await Promise.all([counts(), activity(), vaultStatus()]);
 
   const plan = dayPlan({
     newAvailable: c.newCards,
@@ -66,10 +67,10 @@ export default async function Home() {
   });
 
   return (
-    <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center px-8 py-24">
+    <main className="safe-b relative mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center px-5 py-16 sm:px-8 sm:py-24">
       <Link
         href="/methodology"
-        className="absolute right-8 top-8 text-xs uppercase tracking-[0.2em] text-ink-3 transition-colors hover:text-ink"
+        className="absolute right-5 top-6 text-[0.6875rem] uppercase tracking-[0.2em] text-ink-3 transition-colors hover:text-ink sm:right-8 sm:top-8 sm:text-xs"
       >
         Methodology
       </Link>
@@ -80,10 +81,10 @@ export default async function Home() {
         {/* ── today ──────────────────────────────────────────────────────── */}
         {plan.cleared ? (
           <div className="mt-16">
-            <div className="card flex items-start gap-5 px-7 py-6">
+            <div className="card flex items-start gap-4 px-5 py-5 sm:gap-5 sm:px-7 sm:py-6">
               <span className="mt-0.5 text-2xl leading-none text-mem-long">✓</span>
               <div className="min-w-0">
-                <p className="text-2xl font-light leading-snug">
+                <p className="text-xl font-light leading-snug sm:text-2xl">
                   {plan.done ? "You've done enough for today" : 'Nothing owed today'}
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-ink-3">
@@ -127,7 +128,7 @@ export default async function Home() {
         ) : (
           <div className="mt-16">
             <p className="text-xs uppercase tracking-[0.18em] text-ink-4">Today</p>
-            <div className="mt-6 grid grid-cols-2 gap-10">
+            <div className="mt-6 grid grid-cols-2 gap-6 sm:gap-10">
               <Goal
                 left={plan.newLeft}
                 done={plan.newDone}
@@ -163,12 +164,12 @@ export default async function Home() {
           </Link>
         </div>
 
-        <div className="mt-16 min-w-0 border-t border-ink-4 pt-10">
+        <div className="mt-12 min-w-0 border-t border-ink-4 pt-8 sm:mt-16 sm:pt-10">
           <ActivityGraph activity={a} />
         </div>
 
-        <div className="mt-12 flex flex-wrap items-center gap-6 border-t border-ink-4 pt-8">
-          <HomeSync />
+        <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-ink-4 pt-8 sm:mt-12">
+          <HomeSync available={vault.available} reason={vault.reason} />
           {c.lastScan?.finished_at && (
             <span className="ml-auto text-xs text-ink-4">
               last synced{' '}

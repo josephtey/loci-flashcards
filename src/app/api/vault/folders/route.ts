@@ -1,6 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { NextResponse } from 'next/server';
+import { vaultStatus } from '@/lib/environment';
 import { vaultRoot } from '@/scanner/vault';
 
 /**
@@ -13,6 +14,11 @@ import { vaultRoot } from '@/scanner/vault';
 const ROOT_FOLDER = 'Ever Green Learnings';
 
 export async function GET() {
+  const vault = await vaultStatus();
+  if (!vault.available) {
+    return NextResponse.json({ error: vault.reason }, { status: 503 });
+  }
+
   const base = path.join(vaultRoot(), ROOT_FOLDER);
 
   let entries;

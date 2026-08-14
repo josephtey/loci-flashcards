@@ -72,7 +72,7 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 px-6 py-10 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-10"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -120,10 +120,10 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
               <button
                 key={r.id}
                 onClick={() => setExpanded(open ? null : r.id)}
-                className="block w-full border-b border-ink-4/50 px-5 py-3 text-left last:border-0 hover:bg-white/[0.02]"
+                className="block w-full border-b border-ink-4/50 px-4 py-3 text-left last:border-0 hover:bg-white/[0.02] active:bg-white/[0.04] sm:px-5"
               >
                 <div className="flex items-baseline gap-3">
-                  <span className="w-11 shrink-0 font-mono text-[0.625rem] tabular-nums text-ink-4">
+                  <span className="hidden w-11 shrink-0 font-mono text-[0.625rem] tabular-nums text-ink-4 xs:block">
                     {new Date(r.at).toLocaleTimeString(undefined, {
                       hour: 'numeric',
                       minute: '2-digit',
@@ -146,7 +146,7 @@ export function DayDetail({ date, onClose }: { date: string; onClose: () => void
                   </span>
                 </div>
                 {open && (
-                  <div className="rise mt-3 pl-14">
+                  <div className="rise mt-3 pl-0 xs:pl-14">
                     {a && <p className="text-sm leading-relaxed text-ink-3">{a}</p>}
                     <p className="mt-2 font-mono text-[0.5625rem] uppercase tracking-wider text-ink-4">
                       {r.angle}

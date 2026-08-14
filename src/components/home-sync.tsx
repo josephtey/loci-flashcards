@@ -17,7 +17,13 @@ interface ScanStatus {
  * minute, and is otherwise completely invisible. So the home page always says whether one is in
  * flight and always offers the stop button, rather than making you go looking for a process.
  */
-export function HomeSync() {
+export function HomeSync({
+  available,
+  reason,
+}: {
+  available: boolean;
+  reason: string | null;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<ScanStatus | null>(null);
@@ -25,6 +31,7 @@ export function HomeSync() {
   const [cancelling, setCancelling] = useState(false);
 
   const check = useCallback(async () => {
+    if (!available) return;
     const s = await fetch('/api/scan')
       .then((r) => r.json() as Promise<ScanStatus>)
       .catch(() => null);
@@ -32,7 +39,7 @@ export function HomeSync() {
       setStatus(s);
       setElapsed(s.elapsedMs ?? 0);
     }
-  }, []);
+  }, [available]);
 
   useEffect(() => {
     const first = setTimeout(check, 0);
@@ -62,6 +69,26 @@ export function HomeSync() {
   }, [check, router]);
 
   const running = status?.running ?? false;
+
+  // Hosted, there is no vault to read and nothing to spawn a scanner with. The button stays
+  // visible so the feature is discoverable, but it says why it can't run rather than failing
+  // three fetches deep.
+  if (!available) {
+    return (
+      <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span
+          aria-disabled="true"
+          title={reason ?? undefined}
+          className="cursor-not-allowed rounded border border-ink-4/50 px-4 py-2 text-sm text-ink-4"
+        >
+          ↻ Sync with Obsidian
+        </span>
+        <span className="max-w-xs text-[0.6875rem] leading-relaxed text-ink-4">
+          needs the vault — run locally to generate cards
+        </span>
+      </span>
+    );
+  }
 
   return (
     <>

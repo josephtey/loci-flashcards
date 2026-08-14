@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { vaultStatus } from '@/lib/environment';
 import { renderDiff } from '@/scanner/blocks';
 import { syncVault } from '@/scanner/sync';
 
@@ -11,6 +12,11 @@ export const maxDuration = 120;
  * and you get the same answer.
  */
 export async function GET(req: Request) {
+  const vault = await vaultStatus();
+  if (!vault.available) {
+    return NextResponse.json({ error: vault.reason }, { status: 503 });
+  }
+
   const only = new URL(req.url).searchParams.getAll('only').filter(Boolean);
   const sync = await syncVault({ preview: true, only: only.length ? only : undefined });
 

@@ -103,14 +103,14 @@ export function ActivityGraph({ activity }: { activity: Activity }) {
                         aria-label={`${d.date}, ${d.reviews} reviewed`}
                         // A day that owed nothing and did nothing still counts — it just has no
                         // volume to colour. An outline says "kept up" without claiming work.
-                        className={`h-[10px] w-[10px] rounded-[2px] transition-transform hover:scale-150 ${
+                        className={`day-cell h-[10px] w-[10px] rounded-[2px] transition-transform hover:scale-150 ${
                           d.reviews === 0 && d.met
                             ? 'bg-transparent ring-1 ring-inset ring-mem-long/35'
                             : FILL[level(d.reviews)]
                         }`}
                       />
                     ) : (
-                      <span key={j} className="h-[10px] w-[10px]" />
+                      <span key={j} className="day-cell h-[10px] w-[10px]" />
                     ),
                   )}
                 </div>

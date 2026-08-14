@@ -140,7 +140,7 @@ export function MethodologyClient() {
   );
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-8 py-10">
+    <main className="safe-b mx-auto flex min-h-dvh max-w-3xl flex-col px-5 py-6 sm:px-8 sm:py-10">
       <header className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
           <HomeButton />

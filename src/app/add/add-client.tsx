@@ -173,7 +173,7 @@ export function AddClient() {
 
   if (status === 'extracting') {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-8">
+      <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6">
         <div className="rise flex flex-col items-center gap-5">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ink-2" />
           <p className="text-sm text-ink-2">
@@ -196,7 +196,7 @@ export function AddClient() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-8 py-10">
+    <main className="safe-b mx-auto flex min-h-dvh max-w-3xl flex-col px-5 py-6 sm:px-8 sm:py-10">
       {status === 'reviewing' && drafts.length > 0 && (
         <QuickReview
           cards={drafts}
@@ -268,7 +268,7 @@ export function AddClient() {
             </button>
           </div>
 
-          <ul className="mt-2 max-h-[22rem] flex-1 overflow-y-auto">
+          <ul className="mt-2 max-h-[22rem] flex-1 overflow-y-auto overflow-x-hidden">
             {filtered.map((n) => {
               const on = selected.has(n.path);
               return (
@@ -276,7 +276,7 @@ export function AddClient() {
                   <button
                     onClick={() => !n.isStub && toggle(n.path)}
                     disabled={n.isStub}
-                    className={`group flex w-full items-baseline gap-3 py-2 text-left transition-opacity ${
+                    className={`group flex w-full items-baseline gap-3 py-2.5 text-left transition-opacity sm:py-2 ${
                       n.isStub ? 'cursor-default opacity-25' : ''
                     }`}
                   >
@@ -288,14 +288,14 @@ export function AddClient() {
                     <span className="flex-1 truncate text-sm text-ink-2 group-hover:text-ink">
                       {n.title}
                     </span>
-                    <span className="shrink-0 font-mono text-[0.625rem] tabular-nums text-ink-4">
+                    <span className="hidden min-w-0 shrink truncate font-mono text-[0.625rem] tabular-nums text-ink-4 sm:block">
                       {n.subfolder ?? n.folder}
                     </span>
-                    <span className="w-12 shrink-0 text-right font-mono text-[0.625rem] tabular-nums text-ink-4">
+                    <span className="ml-auto w-12 shrink-0 text-right font-mono text-[0.625rem] tabular-nums text-ink-4">
                       {n.isStub ? 'stub' : `${words(n.wordCount)}w`}
                     </span>
                     <span
-                      className={`w-14 shrink-0 text-right font-mono text-[0.625rem] tabular-nums ${
+                      className={`hidden w-14 shrink-0 text-right font-mono text-[0.625rem] tabular-nums xs:block ${
                         n.cards ? 'text-ink-3' : 'text-ink-4'
                       }`}
                       title={`${n.cards} cards, ${n.pending} awaiting triage`}
@@ -347,7 +347,7 @@ export function AddClient() {
                 onChange={(e) => setCount(Number(e.target.value))}
                 className="h-1 flex-1 min-w-40 cursor-pointer appearance-none rounded-full bg-ink-4 accent-ink"
               />
-              <span className="w-24 shrink-0 font-mono text-[0.6875rem] tabular-nums text-ink-2">
+              <span className="w-20 shrink-0 font-mono text-[0.6875rem] tabular-nums text-ink-2 sm:w-24">
                 {count === 0 ? 'as it holds' : `~${count} card${count === 1 ? '' : 's'}`}
               </span>
             </div>

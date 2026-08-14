@@ -117,6 +117,11 @@ export function Review({ cards, mode }: SessionProps) {
     if (done) router.refresh();
   }, [done, router]);
 
+  const beginDrop = useCallback(() => {
+    setDropping(true);
+    requestAnimationFrame(() => reasonRef.current?.focus());
+  }, []);
+
   const drop = useCallback(
     () => send({ action: 'drop', reason: reason.trim() || undefined }),
     [send, reason],
@@ -184,8 +189,7 @@ export function Review({ cards, mode }: SessionProps) {
 
       if (e.key === 'd') {
         e.preventDefault();
-        setDropping(true);
-        requestAnimationFrame(() => reasonRef.current?.focus());
+        beginDrop();
         return;
       }
 
@@ -201,11 +205,11 @@ export function Review({ cards, mode }: SessionProps) {
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [done, busy, flipped, dropping, editing, send, gradeCard, startEditing, saveEdit, goBack]);
+  }, [done, busy, flipped, dropping, editing, send, gradeCard, startEditing, saveEdit, goBack, beginDrop]);
 
   if (done) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center px-8">
+      <main className="flex min-h-dvh flex-col items-center justify-center px-6">
         <p className="rise text-ink-3">
           Done — {cards.length} {isNew ? 'new card' : 'review'}
           {cards.length === 1 ? '' : 's'}.
@@ -225,7 +229,7 @@ export function Review({ cards, mode }: SessionProps) {
   const answer = isCloze ? renderCloze(card.cloze_text!, true) : (local?.back ?? card.back);
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col px-8 py-10">
+    <main className="safe-b mx-auto flex min-h-dvh max-w-3xl flex-col px-5 py-6 sm:px-8 sm:py-10">
       <header className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
           <HomeButton />
@@ -244,8 +248,8 @@ export function Review({ cards, mode }: SessionProps) {
           value applied — which outranks a normal declaration in the cascade and silently pins
           the card to `transform: none`, so the flip class toggles but nothing rotates. */}
       {editing ? (
-        <div className="rise flex flex-1 flex-col justify-center py-12">
-          <div className="card px-8 py-8">
+        <div className="rise flex flex-1 flex-col justify-center py-6 sm:py-12">
+          <div className="card px-5 py-6 sm:px-8 sm:py-8">
             <label className="mb-2 block text-[0.6875rem] uppercase tracking-[0.18em] text-ink-3">
               Prompt
             </label>
@@ -282,27 +286,27 @@ export function Review({ cards, mode }: SessionProps) {
           </div>
         </div>
       ) : (
-      <div className="flip-scene flex flex-1 items-center justify-center py-12">
+      <div className="flip-scene flex flex-1 items-center justify-center py-6 sm:py-12">
         <div key={card.id} className="deal w-full">
           <div
             data-flipped={flipped}
             onClick={() => setFlipped((v) => !v)}
             className="flip-inner relative w-full cursor-pointer select-none"
-            style={{ minHeight: '18rem' }}
+            style={{ minHeight: 'min(18rem, 42vh)' }}
           >
             {/* Front */}
-            <div className="card flip-face flex min-h-[18rem] flex-col items-center justify-center px-10 py-12 text-center">
+            <div className="card flip-face flex min-h-[min(18rem,42vh)] flex-col items-center justify-center px-6 py-10 text-center sm:px-10 sm:py-12">
               <RichText
                 text={question}
-                className="text-[1.75rem] font-light leading-snug sm:text-[2rem]"
+                className="text-[1.375rem] font-light leading-snug sm:text-[2rem]"
               />
               {isCloze && card.front && <p className="mt-6 text-sm text-ink-3">{card.front}</p>}
             </div>
 
             {/* Back */}
-            <div className="card flip-face flip-face--back absolute inset-0 flex min-h-[18rem] flex-col items-center justify-center px-10 py-12 text-center">
+            <div className="card flip-face flip-face--back absolute inset-0 flex min-h-[min(18rem,42vh)] flex-col items-center justify-center px-6 py-10 text-center sm:px-10 sm:py-12">
               {answer ? (
-                <RichText text={answer} className="text-xl font-light leading-relaxed text-ink" />
+                <RichText text={answer} className="text-lg font-light leading-relaxed text-ink sm:text-xl" />
               ) : (
                 <p className="text-sm text-ink-3">
                   No answer — the value here is being asked, not recalling.
@@ -333,28 +337,40 @@ export function Review({ cards, mode }: SessionProps) {
               }
             }}
             placeholder="Why drop it? (teaches the next scan)"
-            className="flex-1 bg-transparent text-sm placeholder:text-ink-4"
+            className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-ink-4"
           />
           <kbd>↵</kbd>
+          <button
+            onClick={() => void drop()}
+            className="shrink-0 rounded border border-ink-4 px-3 py-1.5 text-xs text-ink-3 transition-colors hover:border-mem-fresh hover:text-mem-fresh"
+          >
+            Drop
+          </button>
+          <button
+            onClick={() => setDropping(false)}
+            className="shrink-0 text-xs text-ink-4 transition-colors hover:text-ink-2"
+          >
+            Cancel
+          </button>
         </div>
       )}
 
       <footer className="border-t border-ink-4 pt-6">
         {!flipped ? (
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-3">
-            <span>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-ink-3">
+            <button onClick={() => setFlipped(true)} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
               <kbd>space</kbd> reveal
-            </span>
-            <span>
+            </button>
+            <button onClick={startEditing} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
               <kbd>e</kbd> edit
-            </span>
-            <span>
+            </button>
+            <button onClick={beginDrop} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
               <kbd>d</kbd> drop
-            </span>
+            </button>
             {idx > 0 && (
-              <span>
+              <button onClick={goBack} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>←</kbd> back
-              </span>
+              </button>
             )}
           </div>
         ) : (
@@ -378,7 +394,7 @@ export function Review({ cards, mode }: SessionProps) {
               </div>
             )}
 
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-4 gap-2 sm:gap-3">
               {RATINGS.map((r) => {
                 const chosen = given[card.id] === r;
                 return (
@@ -386,7 +402,7 @@ export function Review({ cards, mode }: SessionProps) {
                   key={r}
                   onClick={() => void gradeCard(r)}
                   disabled={busy}
-                  className={`group rounded border py-4 transition-colors disabled:opacity-40 ${
+                  className={`group rounded border py-4 transition-colors active:bg-surface disabled:opacity-40 ${
                     chosen ? 'border-ink bg-surface' : 'border-ink-4 hover:border-ink-2'
                   }`}
                 >
@@ -401,20 +417,20 @@ export function Review({ cards, mode }: SessionProps) {
               })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-ink-3">
-              <span>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-ink-3">
+              <span className="hidden sm:inline">
                 <kbd>1</kbd>–<kbd>4</kbd> {given[card.id] ? 'change grade' : 'grade'}
               </span>
-              <span>
+              <button onClick={startEditing} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>e</kbd> edit
-              </span>
-              <span>
+              </button>
+              <button onClick={beginDrop} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>d</kbd> drop
-              </span>
+              </button>
               {idx > 0 && (
-                <span>
+                <button onClick={goBack} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                   <kbd>←</kbd> back
-                </span>
+                </button>
               )}
               {card.lapses >= 2 && (
                 <span className="ml-auto text-ink-2">

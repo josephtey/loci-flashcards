@@ -87,7 +87,7 @@ export function QuickReview({
   const answer = isCloze ? renderCloze(card.cloze_text!, true) : card?.back;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 px-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/95 px-4 py-6 backdrop-blur-sm sm:px-6 sm:py-10">
       <div className="rise flex w-full max-w-2xl flex-col">
         <div className="flex items-baseline justify-between text-xs text-ink-3">
           <span>{done ? 'Ready to add' : 'Check before adding'}</span>
@@ -120,9 +120,9 @@ export function QuickReview({
           <>
             <div
               onClick={() => setFlipped((v) => !v)}
-              className="card mt-6 min-h-[16rem] cursor-pointer select-none px-8 py-10"
+              className="card mt-6 min-h-[min(16rem,40vh)] cursor-pointer select-none px-6 py-8 sm:px-8 sm:py-10"
             >
-              <RichText text={question ?? ''} className="text-xl font-light leading-snug" />
+              <RichText text={question ?? ''} className="text-lg font-light leading-snug sm:text-xl" />
               {flipped && (
                 <div className="rise">
                   <div className="my-6 h-px w-10 bg-ink-4" />

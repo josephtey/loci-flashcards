@@ -39,6 +39,7 @@
   --color-mem-medium: var(--mem-medium);
   --color-mem-long: var(--mem-long);
   --color-mem-dropped: var(--mem-dropped);
+  --breakpoint-xs: 26rem;
   --font-sans: var(--font-sans-stack);
   --font-mono: var(--font-mono-stack);
 }
@@ -190,4 +191,42 @@ input:focus {
 }
 .prose-card li {
   margin-bottom: 0.5rem;
+}
+
+/* ── touch ──────────────────────────────────────────────────────────────────
+   Half of this app is used one-handed on a phone at the end of the day. The card is a large tap
+   target that flips, and every keyboard affordance has a button behind it. */
+
+* {
+  /* Kills the 300ms double-tap-to-zoom delay without disabling pinch-zoom. */
+  touch-action: manipulation;
+}
+
+button,
+a,
+[role='button'] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Notches and home indicators. `viewportFit: cover` lets the page paint under them, so anything
+   pinned to an edge has to pad itself back out. */
+.safe-b {
+  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+}
+.safe-x {
+  padding-left: max(env(safe-area-inset-left), 0px);
+  padding-right: max(env(safe-area-inset-right), 0px);
+}
+
+/* Keyboard hints are noise on a device without one — the buttons beside them still work. */
+@media (hover: none) and (pointer: coarse) {
+  kbd {
+    display: none;
+  }
+
+  /* A year of 10px squares is legible but untappable. Fingers get 15px. */
+  .day-cell {
+    width: 15px;
+    height: 15px;
+  }
 }
