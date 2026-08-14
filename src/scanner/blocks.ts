@@ -105,7 +105,114 @@ export function splitBlocks(content: string): Block[] {
   }
 
   flush();
-  return mergeAdjacentLists(blocks);
+  return reindex(splitOversized(mergeAdjacentLists(blocks)));
+}
+
+/**
+ * The largest a list block may be before it gets split along its outline.
+ *
+ * Roughly two hundred words — about two targets' worth. Small enough that an edit is localised to
+ * the part that changed, large enough that a mechanism written as five steps stays intact, since
+ * nothing under this size is ever split at all.
+ */
+const MAX_LIST_BLOCK = 1200;
+
+/** Leading whitespace, with a tab counted as four columns so mixed indentation still sorts. */
+function indentOf(line: string): number {
+  const ws = /^[ \t]*/.exec(line)![0];
+  return [...ws].reduce((n, c) => n + (c === '\t' ? 4 : 1), 0);
+}
+
+/** An outline item's own text, for use as breadcrumb context on its children. */
+function labelOf(line: string): string {
+  const text = line.replace(LIST_ITEM, '').trim();
+  return text.length > 60 ? `${text.slice(0, 60)}…` : text;
+}
+
+/**
+ * Break an oversized outline into one block per top-level item.
+ *
+ * A note written as a single nested outline — everything hanging off one or two root bullets, as
+ * most of Joseph's technical notes are — is one uninterrupted list run, so merging leaves the
+ * whole document as a single block. That looks harmless until you edit it: the entire note then
+ * reads as one changed block, so adding a section on binding assays hands the extractor four
+ * thousand words of already-covered material and asks it to find what is new. It re-proposes
+ * targets across the lot, and provenance is no better — one hash covering most of the note means
+ * any edit anywhere marks every card drawn from it as stale.
+ *
+ * Splitting descends indentation levels until the pieces are small enough, so the unit is
+ * whatever level of the outline actually carries the structure, and each piece keeps its
+ * ancestors as a breadcrumb path.
+ */
+function splitOutline(
+  text: string,
+  path: string | null,
+  max: number,
+): { content: string; path: string | null }[] {
+  if (text.length <= max) return [{ content: text, path }];
+
+  const lines = text.split('\n');
+  const items = lines.filter((l) => l.trim() && LIST_ITEM.test(l));
+  if (!items.length) return [{ content: text, path }];
+
+  const outermost = Math.min(...items.map(indentOf));
+  const groups: string[][] = [];
+  let cur: string[] = [];
+  for (const line of lines) {
+    const startsItem = Boolean(line.trim()) && LIST_ITEM.test(line) && indentOf(line) === outermost;
+    if (startsItem && cur.length) {
+      groups.push(cur);
+      cur = [];
+    }
+    cur.push(line);
+  }
+  if (cur.length) groups.push(cur);
+
+  // A single root item wrapping the whole note carries no information on its own — adopt its text
+  // as context and split the children instead, or nothing would ever divide.
+  if (groups.length === 1) {
+    const [head, ...rest] = groups[0];
+    const body = rest.join('\n').trim();
+    if (!body || !LIST_ITEM.test(head)) return [{ content: text, path }];
+    const label = labelOf(head);
+    const inner = splitOutline(body, path ? `${path} > ${label}` : label, max);
+    // The root's own line rides with its first child. Using it only as a breadcrumb would drop it
+    // from the text, and a breadcrumb is truncated — the sentence itself has to survive intact.
+    if (inner.length) inner[0] = { ...inner[0], content: `${head.trim()}\n${inner[0].content}` };
+    return inner;
+  }
+
+  return groups.flatMap((group) => {
+    const chunk = group.join('\n').trim();
+    if (!chunk) return [];
+    if (chunk.length <= max) return [{ content: chunk, path }];
+
+    const [head, ...rest] = group;
+    const body = rest.join('\n').trim();
+    if (!body) return [{ content: chunk, path }];
+
+    const label = labelOf(head);
+    const inner = splitOutline(body, path ? `${path} > ${label}` : label, max);
+    // The item's own line rides with its first child, so no text is dropped on the way down.
+    if (inner.length) inner[0] = { ...inner[0], content: `${head.trim()}\n${inner[0].content}` };
+    return inner;
+  });
+}
+
+function splitOversized(blocks: Block[]): Block[] {
+  return blocks.flatMap((block) => {
+    if (block.kind !== 'list' || block.content.length <= MAX_LIST_BLOCK) return [block];
+    return splitOutline(block.content, block.headingPath, MAX_LIST_BLOCK).map((piece) => ({
+      ...block,
+      content: piece.content,
+      contentHash: sha256(piece.content),
+      headingPath: piece.path,
+    }));
+  });
+}
+
+function reindex(blocks: Block[]): Block[] {
+  return blocks.map((b, idx) => ({ ...b, idx }));
 }
 
 /**
@@ -156,7 +263,17 @@ export function diffBlocks(previous: Block[], current: Block[]): BlockDiff {
   const currHashes = new Set(current.map((b) => b.contentHash));
 
   const fresh = current.filter((b) => !prevHashes.has(b.contentHash));
-  const removed = previous.filter((b) => !currHashes.has(b.contentHash));
+
+  // A block whose hash is gone has not necessarily lost its text: changing where the splitter
+  // draws its boundaries rehashes everything while the prose sits exactly where it was. Cards
+  // carry the hash of the block they came from, so taking the hash at face value would retire
+  // most of the deck the first time the splitter changes. Only text that is genuinely absent from
+  // the note counts as removed.
+  const bare = (s: string) => s.replace(/\s+/g, ' ').trim();
+  const haystack = bare(current.map((b) => b.content).join(' '));
+  const removed = previous.filter(
+    (b) => !currHashes.has(b.contentHash) && !haystack.includes(bare(b.content)),
+  );
   const removedSections = new Set(removed.map((b) => b.headingPath ?? ''));
 
   return {

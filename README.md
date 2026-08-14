@@ -39,7 +39,13 @@ vault ──▶ diff ──▶ ① targets ──▶ ② write ──▶ ③ jud
 **The diff engine** keeps its own snapshot — full note text plus a hash per semantic block —
 rather than leaning on git. A changed note is found by content hash; the changed *parts* by block
 hash. Blank-line-separated list runs merge back into one block, so a four-step mechanism stays one
-unit rather than four.
+unit rather than four; oversized outlines then split along their own indentation, so a note
+written as one deep nested list doesn't collapse into a single block that reads as wholly changed
+every time one bullet moves. Blocks keep their ancestor bullets as a breadcrumb path.
+
+A block whose hash disappears isn't assumed deleted — its text has to be genuinely absent from the
+note. Cards are pinned to the hash of the block they came from, so without that check, any change
+to how the splitter draws boundaries would retire most of the deck at once.
 
 The snapshot is committed **per note, after that note has been extracted from**. Committing it up
 front means a run that's cancelled or crashes halfway leaves every note it never reached looking
