@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# The example is the documentation for .env.local — it holds no secrets.
+!.env.example

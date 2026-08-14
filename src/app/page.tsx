@@ -1,69 +1,185 @@
-import Image from "next/image";
+import Link from 'next/link';
+import { ActivityGraph } from '@/components/activity-graph';
+import { HomeSync } from '@/components/home-sync';
+import { dayPlan } from '@/lib/goals';
+import { activity, counts } from '@/lib/queries';
 
-export default function Home() {
+export const dynamic = 'force-dynamic';
+
+/**
+ * One half of today's plan.
+ *
+ * The headline number is what's *left*, not what exists. A total is a standing accusation — it
+ * only ever goes up when you write more, so it reads as debt however much work you do. What's
+ * left today is a number you can drive to zero, which is the only kind worth putting in 48px.
+ */
+function Goal({
+  left,
+  done,
+  goal,
+  label,
+  action,
+  href,
+}: {
+  left: number;
+  done: number;
+  goal: number;
+  label: string;
+  action: string;
+  href: string;
+}) {
+  const finished = left === 0;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+    <div className={finished ? 'opacity-45' : undefined}>
+      <div className="flex items-baseline gap-2">
+        <span className="text-5xl font-light tabular-nums">{finished ? '✓' : left}</span>
+        {goal > 0 && (
+          <span className="font-mono text-[0.625rem] tabular-nums text-ink-4">
+            {done}/{goal}
+          </span>
+        )}
+      </div>
+      <div className="mt-2 text-xs uppercase tracking-[0.18em] text-ink-3">{label}</div>
+      {finished ? (
+        <span className="mt-4 inline-block text-sm text-ink-4">done</span>
+      ) : (
+        <Link
+          href={href}
+          className="mt-4 inline-block text-sm text-ink-2 transition-colors hover:text-ink"
+        >
+          {action} <span className="text-ink-3">→</span>
+        </Link>
+      )}
     </div>
+  );
+}
+
+export default async function Home() {
+  const [c, a] = await Promise.all([counts(), activity()]);
+
+  const plan = dayPlan({
+    newAvailable: c.newCards,
+    dueNow: c.dueNow,
+    learnedToday: a.todayLearned,
+    reviewedToday: a.todayReviews - a.todayLearned,
+  });
+
+  return (
+    <main className="relative mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center px-8 py-24">
+      <Link
+        href="/methodology"
+        className="absolute right-8 top-8 text-xs uppercase tracking-[0.2em] text-ink-3 transition-colors hover:text-ink"
+      >
+        Methodology
+      </Link>
+
+      <div className="rise min-w-0">
+        <h1 className="text-sm uppercase tracking-[0.35em] text-ink-3">Loci</h1>
+
+        {/* ── today ──────────────────────────────────────────────────────── */}
+        {plan.cleared ? (
+          <div className="mt-16">
+            <div className="card flex items-start gap-5 px-7 py-6">
+              <span className="mt-0.5 text-2xl leading-none text-mem-long">✓</span>
+              <div className="min-w-0">
+                <p className="text-2xl font-light leading-snug">
+                  {plan.done ? "You've done enough for today" : 'Nothing owed today'}
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-ink-3">
+                  {plan.done
+                    ? `Everything due is cleared${plan.newGoal > 0 ? ` and today's ${plan.newGoal} new card${plan.newGoal === 1 ? '' : 's'} are in` : ''}.`
+                    : `Everything due is cleared. ${plan.newLeft} new card${plan.newLeft === 1 ? '' : 's'} waiting if you want ${plan.newLeft === 1 ? 'it' : 'them'} — the day already counts either way.`}
+                  {a.streak > 0 && (
+                    <span className="text-ink-2">
+                      {' '}
+                      That&rsquo;s {a.streak} day{a.streak === 1 ? '' : 's'} in a row.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            {/* Stopping here is the recommendation, not a rule. Carrying on is one click away —
+                just labelled honestly, since tomorrow's session is where it comes from. */}
+            {(c.dueNow > 0 || c.newCards > 0) && (
+              <div className="mt-6 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                <span className="text-xs text-ink-4">Want to keep going?</span>
+                {c.dueNow > 0 && (
+                  <Link
+                    href="/review"
+                    className="text-sm text-ink-3 transition-colors hover:text-ink"
+                  >
+                    Review {c.dueNow} more <span className="text-ink-4">→</span>
+                  </Link>
+                )}
+                {c.newCards > 0 && (
+                  <Link href="/new" className="text-sm text-ink-3 transition-colors hover:text-ink">
+                    Learn {c.newCards} more <span className="text-ink-4">→</span>
+                  </Link>
+                )}
+                <span className="text-[0.6875rem] text-ink-4">
+                  every extra card today is one you owe tomorrow
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="mt-16">
+            <p className="text-xs uppercase tracking-[0.18em] text-ink-4">Today</p>
+            <div className="mt-6 grid grid-cols-2 gap-10">
+              <Goal
+                left={plan.newLeft}
+                done={plan.newDone}
+                goal={plan.newGoal}
+                label="to learn"
+                action="Start learning"
+                href="/new"
+              />
+              <Goal
+                left={plan.reviewLeft}
+                done={plan.reviewDone}
+                goal={plan.reviewGoal}
+                label="to review"
+                action="Review now"
+                href="/review"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* The whole deck, deliberately quiet: it's context, not a to-do list. */}
+        <div className="mt-10 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[0.6875rem] text-ink-4">
+          <span className="tabular-nums">{c.activeCards} in deck</span>
+          <span className="tabular-nums">{c.newCards} never seen</span>
+          {c.dueNow > plan.reviewGoal && (
+            <span className="tabular-nums">{c.dueNow} due in total</span>
+          )}
+          {c.needsRewrite > 0 && (
+            <span className="tabular-nums">{c.needsRewrite} awaiting rewrite</span>
+          )}
+          <Link href="/cards" className="transition-colors hover:text-ink-2">
+            See all →
+          </Link>
+        </div>
+
+        <div className="mt-16 min-w-0 border-t border-ink-4 pt-10">
+          <ActivityGraph activity={a} />
+        </div>
+
+        <div className="mt-12 flex flex-wrap items-center gap-6 border-t border-ink-4 pt-8">
+          <HomeSync />
+          {c.lastScan?.finished_at && (
+            <span className="ml-auto text-xs text-ink-4">
+              last synced{' '}
+              {new Date(c.lastScan.finished_at).toLocaleDateString(undefined, {
+                month: 'short',
+                day: 'numeric',
+              })}
+            </span>
+          )}
+        </div>
+      </div>
+    </main>
   );
 }

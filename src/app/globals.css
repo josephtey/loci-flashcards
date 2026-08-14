@@ -1,26 +1,193 @@
 @import "tailwindcss";
 
+/*
+  Black. White text. As little else as possible.
+  Every value here is one of five greys plus one accent — a card in a dark room, nothing else
+  competing for attention. Restraint is the point: this is read at 11pm, half-awake.
+*/
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #ffffff;
+  --ink-2: #a1a1a1; /* secondary text */
+  --ink-3: #5c5c5c; /* labels, meta */
+  --ink-4: #2a2a2a; /* hairlines */
+  --bg: #000000;
+  --surface: #0b0b0b;
+  --accent: #d4d4d4;
+
+  /* Memory strength. A warm-to-cool ramp: the hotter it looks, the more precarious it is.
+     Desaturated on purpose — this is a status dot in a dense table, not a chart. */
+  --mem-new: #7f8ea3;
+  --mem-fresh: #c97b4e;
+  --mem-short: #c2a04e;
+  --mem-medium: #5f9ea0;
+  --mem-long: #6e9e6e;
+  --mem-dropped: #3a3a3a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-ink-4: var(--ink-4);
+  --color-accent: var(--accent);
+  --color-mem-new: var(--mem-new);
+  --color-mem-fresh: var(--mem-fresh);
+  --color-mem-short: var(--mem-short);
+  --color-mem-medium: var(--mem-medium);
+  --color-mem-long: var(--mem-long);
+  --color-mem-dropped: var(--mem-dropped);
+  --font-sans: var(--font-sans-stack);
+  --font-mono: var(--font-mono-stack);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background: var(--bg);
+  color: var(--ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans-stack);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+/* ── The card ─────────────────────────────────────────────────────────────── */
+
+/*
+  A card should read as an object sitting on the page, not as a region of it. On a black ground
+  that needs three things at once: a face lifted off the background, an edge catching a little
+  more light at the top than the bottom, and a shadow deep enough to imply the gap. Any one alone
+  reads as a box.
+*/
+.card {
+  background: linear-gradient(180deg, #17171a 0%, #121215 100%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 0.875rem;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
+    0 18px 40px -16px rgba(0, 0, 0, 0.9),
+    0 2px 8px -2px rgba(0, 0, 0, 0.6);
+}
+
+.card-quiet {
+  background: #101013;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0.75rem;
+}
+
+
+.flip-scene {
+  perspective: 1800px;
+}
+
+.flip-inner {
+  transform-style: preserve-3d;
+  transition: transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.flip-inner[data-flipped="true"] {
+  transform: rotateX(180deg);
+}
+
+.flip-face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.flip-face--back {
+  transform: rotateX(180deg);
+}
+
+/* Cards arrive from below and settle. Subtle enough to read as continuity, not decoration. */
+@keyframes deal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.deal {
+  animation: deal 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.rise {
+  animation: rise 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner,
+  .deal,
+  .rise {
+    transition: none;
+    animation: none;
+  }
+}
+
+/* ── Chrome ───────────────────────────────────────────────────────────────── */
+
+kbd {
+  font-family: var(--font-mono-stack);
+  font-size: 0.6875rem;
+  line-height: 1;
+  padding: 0.25rem 0.375rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--ink-4);
+  color: var(--ink-3);
+}
+
+textarea,
+input {
+  field-sizing: content;
+}
+
+textarea:focus,
+input:focus {
+  outline: none;
+}
+
+/* Markdown-ish rendering inside card faces — just enough for the vault's idiom. */
+.prose-card strong {
+  font-weight: 600;
+}
+.prose-card em {
+  font-style: italic;
+  color: var(--ink-2);
+}
+.prose-card code {
+  font-family: var(--font-mono-stack);
+  font-size: 0.9em;
+  color: var(--accent);
+}
+.prose-card ol,
+.prose-card ul {
+  text-align: left;
+  display: inline-block;
+  margin-top: 0.75rem;
+}
+.prose-card li {
+  margin-bottom: 0.5rem;
 }

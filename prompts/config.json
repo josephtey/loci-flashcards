@@ -1,0 +1,17 @@
+{
+  "wordsPerTarget": 110,
+  "targetsPerNoteMax": 40,
+  "candidatesPerTarget": 3,
+  "cardsPerTarget": 1,
+  "keepScoreThreshold": 6,
+  "batchSize": 5,
+  "duplicateCertain": 0.72,
+  "duplicateGrey": 0.3,
+  "coverageContext": 14,
+  "model": "claude-sonnet-5",
+  "modelDedup": "claude-haiku-4-5",
+  "effortStage1": "high",
+  "effortStage2": "high",
+  "effortStage3": "high",
+  "effortQuickAdd": "medium"
+}

@@ -6,21 +6,34 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "scan": "tsx src/scanner/index.ts",
+    "scan:dry": "tsx src/scanner/index.ts --dry",
+    "typecheck": "tsc --noEmit",
+    "doctor": "tsx src/scanner/doctor.ts",
+    "reset": "tsx src/scanner/reset.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.117.1",
+    "@supabase/supabase-js": "^2.112.3",
+    "gray-matter": "^4.0.3",
     "next": "16.3.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1",
+    "ts-fsrs": "^5.4.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.12",
     "typescript": "^5"
   }
 }
