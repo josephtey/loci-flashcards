@@ -67,7 +67,7 @@ export default async function Home() {
   });
 
   return (
-    <main className="safe-b relative mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center px-5 pb-28 pt-14 sm:px-8 sm:pb-40 sm:pt-20">
+    <main className="safe-b relative mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center px-5 pb-40 pt-14 sm:px-8 sm:pb-56 sm:pt-20">
       <Link
         href="/methodology"
         className="absolute right-5 top-6 text-[0.6875rem] uppercase tracking-[0.2em] text-ink-3 transition-colors hover:text-ink sm:right-8 sm:top-8 sm:text-xs"

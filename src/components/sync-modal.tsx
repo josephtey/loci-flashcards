@@ -98,6 +98,8 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
   const [runs, setRuns] = useState<Run[] | null>(null);
   const [openRun, setOpenRun] = useState<string | null>(null);
   const [openRunNote, setOpenRunNote] = useState<string | null>(null);
+  /** False when run_notes hasn't been created yet — runs list, but their diffs weren't recorded. */
+  const [detailed, setDetailed] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanLog, setScanLog] = useState<string | null>(null);
@@ -167,9 +169,10 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
 
   const loadHistory = useCallback(async () => {
     const d = await fetch('/api/sync/log')
-      .then((r) => r.json() as Promise<{ runs: Run[] }>)
-      .catch(() => ({ runs: [] }));
+      .then((r) => r.json() as Promise<{ runs: Run[]; detailed?: boolean }>)
+      .catch(() => ({ runs: [], detailed: true }));
     setRuns(d.runs ?? []);
+    setDetailed(d.detailed !== false);
   }, []);
 
   // Running: tick a clock and watch for the scan to finish.
@@ -448,6 +451,13 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
 
           {phase === 'diffs' && tab === 'history' && runs?.length === 0 && (
             <p className="p-6 text-sm text-ink-3">No runs recorded yet.</p>
+          )}
+
+          {phase === 'diffs' && tab === 'history' && !detailed && Boolean(runs?.length) && (
+            <p className="border-b border-ink-4/50 px-4 py-3 text-xs leading-relaxed text-ink-4 sm:px-5">
+              Runs are listed, but the text each one read isn&rsquo;t being recorded — that needs
+              migration 0005. Apply it and every run from then on keeps its diff.
+            </p>
           )}
 
           {phase === 'diffs' &&
