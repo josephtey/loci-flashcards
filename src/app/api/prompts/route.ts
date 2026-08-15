@@ -22,7 +22,12 @@ export async function GET() {
     keys.map(async (key) => ({
       key,
       ...PROMPT_FILES[key],
-      body: await readPrompt(key).catch(() => ''),
+      // Swallowing the error rendered a missing file as an empty editor — and saving from there
+      // would have written that emptiness back over the real one.
+      body: await readPrompt(key).catch((e: unknown) => {
+        console.error(`prompt "${key}" could not be read:`, e);
+        return null;
+      }),
     })),
   );
   return NextResponse.json({ prompts, config: await readConfig(), labels: CONFIG_LABELS });

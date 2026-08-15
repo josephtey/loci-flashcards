@@ -50,7 +50,8 @@ export const PROMPT_FILES = {
   },
   principles: {
     title: 'Principles',
-    file: 'docs/prompt-principles.md',
+    root: 'docs',
+    file: 'prompt-principles.md',
     role: 'Injected verbatim into every stage above, wherever {{PRINCIPLES}} appears.',
   },
 } as const;
@@ -128,8 +129,18 @@ const PROMPTS_DIR = 'prompts';
  * where `join(cwd(), someVariable)` forces it to ship the entire project — every source file and
  * everything in `public/` — into the serverless bundle.
  */
-function resolve(file: string): string {
-  return path.join(process.cwd(), PROMPTS_DIR, file);
+function resolve(file: string, root?: string): string {
+  // Both branches join a *literal* directory. A bundler can see each is confined to one folder
+  // and trace just that folder; `join(cwd(), someVariable)` makes it ship the entire project.
+  return root === 'docs'
+    ? path.join(process.cwd(), 'docs', file)
+    : path.join(process.cwd(), PROMPTS_DIR, file);
+}
+
+/** The registry entries carry an optional root, so read and write agree on where a file lives. */
+function locate(key: PromptKey): string {
+  const entry = PROMPT_FILES[key] as { file: string; root?: string };
+  return resolve(entry.file, entry.root);
 }
 
 /**
@@ -153,13 +164,13 @@ const READ_ONLY =
   'Edit them in the repo, or run the app locally.';
 
 export async function readPrompt(key: PromptKey): Promise<string> {
-  return readFile(resolve(PROMPT_FILES[key].file), 'utf8');
+  return readFile(locate(key), 'utf8');
 }
 
 export async function writePrompt(key: PromptKey, body: string): Promise<void> {
   if (!body.trim()) throw new Error('A prompt cannot be empty.');
   if (!(await promptsWritable())) throw new Error(READ_ONLY);
-  await writeFile(resolve(PROMPT_FILES[key].file), body, 'utf8');
+  await writeFile(locate(key), body, 'utf8');
 }
 
 export async function readConfig(): Promise<Config> {

@@ -15,7 +15,8 @@ interface Prompt {
   title: string;
   file: string;
   role: string;
-  body: string;
+  /** null when the file could not be read — an empty editor here would invite saving over it. */
+  body: string | null;
 }
 
 const STAGES = [
@@ -257,6 +258,12 @@ export function MethodologyClient() {
                 </button>
                 {open === 'principles' && (
                   <div className="rise mt-2">
+                    {byKey('principles')?.body === null && (
+                      <p className="mb-2 rounded border border-mem-fresh/40 px-3 py-2 text-xs leading-relaxed text-mem-fresh">
+                        This file could not be read from disk, so the box below is empty — saving
+                        would overwrite it. Check the server log for the path it tried.
+                      </p>
+                    )}
                     <textarea
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
