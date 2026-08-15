@@ -126,11 +126,21 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
     let live = true;
     const t = setTimeout(async () => {
       const running = await fetch('/api/scan')
-        .then((r) => r.json() as Promise<{ running: boolean; elapsedMs: number | null }>)
+        .then(
+          (r) =>
+            r.json() as Promise<{
+              running: boolean;
+              elapsedMs: number | null;
+              startedAt: string | null;
+            }>,
+        )
         .catch(() => null);
       if (!live) return;
       if (running?.running) {
         setElapsed(running.elapsedMs ?? 0);
+        // Adopting a run started before this page loaded — take its real start time so the
+        // results stay scoped to it rather than falling back to whatever completed last.
+        setStartedAt(running.startedAt);
         setPhase('running');
         return;
       }

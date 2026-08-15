@@ -54,6 +54,24 @@ function alive(pid: number | null | undefined): boolean {
   }
 }
 
+/** Longer than any real scan, short enough that a genuinely dead run frees up the same session. */
+const RUN_TIMEOUT_MS = 90 * 60 * 1000;
+
+/**
+ * Has this run stopped without saying so?
+ *
+ * Only the pid can answer that, and the pid only exists once migration 0005 has been applied.
+ * Without it, an unverifiable run must be assumed alive: treating "I can't check" as "it's dead"
+ * marked live scans cancelled on the first poll a few seconds in, so reloading the page mid-scan
+ * reported a failure while the work carried on invisibly in the background. The clock is the
+ * backstop, so a run that really did die still clears on its own.
+ */
+function hasStopped(run: RunRow): boolean {
+  if (run.status !== 'running') return false;
+  if (run.pid == null) return Date.now() - new Date(run.started_at).getTime() > RUN_TIMEOUT_MS;
+  return !alive(run.pid);
+}
+
 interface RunRow {
   id: string;
   /** Present only once migration 0005 has been applied. */
@@ -93,7 +111,7 @@ export async function POST(req: Request) {
   }
 
   const current = await latestRun();
-  if (current?.status === 'running' && alive(current.pid)) {
+  if (current?.status === 'running' && !hasStopped(current)) {
     return NextResponse.json({ started: false, reason: 'already running' }, { status: 409 });
   }
 
@@ -145,7 +163,7 @@ export async function GET() {
   // A 'running' row whose process is gone is a scan that was killed or crashed before it could
   // close itself out. Reconcile it here rather than leaving a job that never ends on screen.
   let stale = false;
-  if (run?.status === 'running' && !alive(run.pid)) {
+  if (run && hasStopped(run)) {
     stale = true;
     await db
       .from('scan_runs')
