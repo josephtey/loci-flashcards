@@ -67,7 +67,7 @@ export default async function Home() {
   });
 
   return (
-    <main className="safe-b relative mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center px-5 py-16 sm:px-8 sm:py-24">
+    <main className="safe-b relative mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center px-5 pb-28 pt-14 sm:px-8 sm:pb-40 sm:pt-20">
       <Link
         href="/methodology"
         className="absolute right-5 top-6 text-[0.6875rem] uppercase tracking-[0.2em] text-ink-3 transition-colors hover:text-ink sm:right-8 sm:top-8 sm:text-xs"
@@ -80,7 +80,7 @@ export default async function Home() {
 
         {/* ── today ──────────────────────────────────────────────────────── */}
         {plan.cleared ? (
-          <div className="mt-16">
+          <div className="mt-8 sm:mt-10">
             <div className="card flex items-start gap-4 px-5 py-5 sm:gap-5 sm:px-7 sm:py-6">
               <span className="mt-0.5 text-2xl leading-none text-mem-long">✓</span>
               <div className="min-w-0">
@@ -126,7 +126,7 @@ export default async function Home() {
             )}
           </div>
         ) : (
-          <div className="mt-16">
+          <div className="mt-8 sm:mt-10">
             <p className="text-xs uppercase tracking-[0.18em] text-ink-4">Today</p>
             <div className="mt-6 grid grid-cols-2 gap-6 sm:gap-10">
               <Goal
