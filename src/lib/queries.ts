@@ -342,7 +342,7 @@ export async function activity(): Promise<Activity> {
       .order('reviewed_at', { ascending: true }),
     // Anything still sitting overdue is a debt that was never discharged — it has to count
     // against every day it was outstanding, not just today.
-    db.from('card_states').select('due, reps').gt('reps', 0),
+    db.from('card_states').select('due, reps, scheduled_days').gt('reps', 0),
   ]);
 
   const byDay = new Map<string, { reviews: number; learned: number }>();
@@ -361,7 +361,11 @@ export async function activity(): Promise<Activity> {
   const floor = dayKey(since);
 
   for (const r of data ?? []) {
-    const before = r.state_before as { reps?: number; due?: string } | null;
+    const before = r.state_before as {
+      reps?: number;
+      due?: string;
+      scheduled_days?: number;
+    } | null;
 
     if (r.action === 'grade') {
       const key = dayKey(r.reviewed_at as string);
@@ -373,6 +377,11 @@ export async function activity(): Promise<Activity> {
     }
 
     if (!before?.reps || !before.due) continue;
+    // Learning steps are not a daily obligation. FSRS brings a card you just met back in ten
+    // minutes, so an evening spent learning always ends with a few steps outstanding — counting
+    // those as debt meant any day you learned new cards could never be cleared, which is exactly
+    // backwards. Only a card scheduled to return on a *later day* is something you owe tomorrow.
+    if (!(Number(before.scheduled_days) >= 1)) continue;
     const from = dayKey(before.due);
     const to = dayKey(r.reviewed_at as string);
     if (to <= from) continue; // reviewed early — it was never a debt
@@ -380,7 +389,13 @@ export async function activity(): Promise<Activity> {
     bump(closed, to);
   }
 
+  const now = Date.now();
   for (const st of states ?? []) {
+    if (!(Number(st.scheduled_days) >= 1)) continue;
+    // Not owed until it comes due. A card scheduled for this evening is on today's list but not
+    // yet a debt, and counting it as one made today look unfinished while the deck said it was
+    // clear. For any earlier day this changes nothing — a future due date can only land today.
+    if (new Date(st.due as string).getTime() > now) continue;
     const from = dayKey(st.due as string);
     bump(opened, from < floor ? floor : from);
   }
