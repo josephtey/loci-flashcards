@@ -8,6 +8,8 @@
   "duplicateCertain": 0.72,
   "duplicateGrey": 0.3,
   "coverageContext": 14,
+  "emphasisMarker": "***",
+  "emphasisWeight": 3,
   "model": "claude-sonnet-5",
   "modelDedup": "claude-haiku-4-5",
   "effortStage1": "high",

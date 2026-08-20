@@ -20,6 +20,20 @@ beneath the system — it is the floor everything else stands on. Joseph cannot 
 pipeline if he cannot remember what ADMET expands to or what a phenotypic screen is. Propose the
 `definition`, `fact`, and `term` targets as you encounter them, then the conceptual ones on top.
 
+## Flagged passages outrank your judgement
+
+Some notes arrive with a section listing passages Joseph marked in the note itself. He wrote the
+note and he knows what he wants to hold; you are inferring it from the text. Where the two
+disagree, he wins.
+
+Treat a flagged passage as several targets' worth rather than one: take more angles on it than you
+would on neighbouring material of the same length, and do not let the overall target figure crowd
+it out — that figure is already scaled up to account for what he flagged. The only reason to skip
+one is that it fails the cover-the-answer test outright.
+
+The marker notation is an instruction to you. It is not part of the material and must never appear
+in an excerpt or a card.
+
 ## What is NOT a target
 
 Be strict here — this is where sweeps go wrong. Do not propose targets from:

@@ -12,6 +12,7 @@ import {
   type Angle,
 } from '../lib/types';
 import { renderDiff } from './blocks';
+import { emphasisWords, findEmphasis } from './emphasis';
 import {
   DEDUP_SYSTEM,
   JUDGE_SYSTEM,
@@ -209,6 +210,7 @@ async function proposeTargets(
     existingFronts: string[];
     rejections: { original: string; reason: string }[];
     request?: string;
+    emphasis: string[];
   },
   budget: number,
   usage: Usage,
@@ -256,6 +258,7 @@ async function proposeTargets(
               linked: ctx.linked,
               existingFronts: ctx.existingFronts,
               rejections: ctx.rejections,
+              emphasis: ctx.emphasis,
               budget,
             }),
       },
@@ -379,7 +382,14 @@ export interface ExtractionSummary {
   cardsProposed: number;
   duplicatesSkipped: number;
   usage: Usage;
-  perNote: { title: string; targets: number; cards: number; skippedReason: string | null }[];
+  perNote: {
+    title: string;
+    targets: number;
+    cards: number;
+    /** Passages Joseph flagged with the emphasis marker. */
+    flagged: number;
+    skippedReason: string | null;
+  }[];
 }
 
 export async function extract(
@@ -451,7 +461,7 @@ export async function extract(
         skipped_reason: 'stub note',
       });
       await change.commit();
-      perNote.push({ title: change.note.title, targets: 0, cards: 0, skippedReason: 'stub note' });
+      perNote.push({ title: change.note.title, targets: 0, cards: 0, flagged: 0, skippedReason: 'stub note' });
       continue;
     }
     if (!change.diff.added.length && !change.diff.changed.length) {
@@ -459,6 +469,7 @@ export async function extract(
         title: change.note.title,
         targets: 0,
         cards: 0,
+        flagged: 0,
         skippedReason: 'only removals',
       });
       await change.commit();
@@ -494,11 +505,17 @@ export async function extract(
       .replace(/https?:\/\/\S+/g, ' ');
     const substantiveWords = changedText.split(/\s+/).filter((w) => /[a-z]/i.test(w)).length;
     const c = await config();
-    const budget = Math.max(1, Math.min(c.targetsPerNoteMax, Math.round(substantiveWords / c.wordsPerTarget)));
+
+    // Anything Joseph flagged counts several times over towards the budget. Coverage is otherwise
+    // purely proportional to length, which treats a throwaway aside and the paragraph he stopped
+    // to mark as equally deserving — and the whole point of the marker is that they are not.
+    const flagged = findEmphasis(changedText, c.emphasisMarker);
+    const weighted = substantiveWords + emphasisWords(flagged) * (c.emphasisWeight - 1);
+    const budget = Math.max(1, Math.min(c.targetsPerNoteMax, Math.round(weighted / c.wordsPerTarget)));
 
     const batch = await proposeTargets(
       change,
-      { linked, existingFronts, rejections, request },
+      { linked, existingFronts, rejections, request, emphasis: flagged.map((f) => f.text) },
       budget,
       usage,
     );
@@ -521,7 +538,7 @@ export async function extract(
         skipped_reason: reason,
       });
       await change.commit();
-      perNote.push({ title: change.note.title, targets: 0, cards: 0, skippedReason: reason });
+      perNote.push({ title: change.note.title, targets: 0, cards: 0, flagged: 0, skippedReason: reason });
       continue;
     }
 
@@ -710,6 +727,7 @@ export async function extract(
       title: change.note.title,
       targets: targets.length - orphans.length,
       cards: noteCards,
+      flagged: flagged.length,
       skippedReason: null,
     });
   }

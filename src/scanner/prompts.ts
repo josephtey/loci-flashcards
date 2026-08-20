@@ -102,6 +102,7 @@ export function stage1User(opts: {
   linked: LinkedNote[];
   existingFronts: string[];
   rejections: { original: string; reason: string }[];
+  emphasis: string[];
   budget: number;
 }): string {
   const parts: string[] = [];
@@ -167,6 +168,30 @@ export function stage1User(opts: {
     for (const r of opts.rejections) {
       parts.push(`- "${r.original.slice(0, 180)}"`);
       parts.push(`  → rejected: ${r.reason || '(no reason given)'}`);
+    }
+  }
+
+  // Joseph's own signal about what matters, and the only one the model can't infer from the text.
+  if (opts.emphasis.length) {
+    parts.push('');
+    parts.push('## Flagged by Joseph as worth remembering');
+    parts.push('');
+    parts.push(
+      'He marked these passages in the note itself. This is his judgement about what is ' +
+        'load-bearing, and it outranks yours: cover every one of them, and cover them more ' +
+        'thoroughly than the surrounding material — several angles on one flagged passage is ' +
+        'right where one would do elsewhere. Only skip a flagged passage if it fails the ' +
+        'cover-the-answer test outright.',
+    );
+    parts.push('');
+    parts.push(
+      'The marker notation is an instruction to you, not part of the material. Never quote it in ' +
+        'an excerpt or a card.',
+    );
+    parts.push('');
+    for (const e of opts.emphasis) {
+      parts.push('> ' + e.split('\n').join('\n> '));
+      parts.push('');
     }
   }
 

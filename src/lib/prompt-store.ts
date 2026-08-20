@@ -72,6 +72,8 @@ export interface Config {
   duplicateCertain: number;
   duplicateGrey: number;
   coverageContext: number;
+  emphasisMarker: string;
+  emphasisWeight: number;
   model: string;
   modelDedup: string;
   effortStage1: Effort;
@@ -90,6 +92,10 @@ export const CONFIG_LABELS: Record<keyof Config, string> = {
   duplicateCertain: 'Similarity above which a card is dropped as a duplicate without asking.',
   duplicateGrey: 'Similarity above which the model is asked whether it is a duplicate.',
   coverageContext: 'Existing cards shown to stage 1 so it knows what ground is taken.',
+  emphasisMarker:
+    'Write this beside a passage in a note to flag it as worth remembering. Pick something that never occurs by accident in your own writing.',
+  emphasisWeight:
+    'How much more coverage flagged material earns. 3 means it counts triple towards the target budget.',
   model: 'Model for stages 1-3.',
   modelDedup: 'Model for the duplicate check. A cheap one is fine.',
   effortStage1: 'Reasoning effort when choosing targets.',
@@ -110,6 +116,8 @@ export const DEFAULT_CONFIG: Config = {
   duplicateCertain: 0.72,
   duplicateGrey: 0.3,
   coverageContext: 14,
+  emphasisMarker: '***',
+  emphasisWeight: 3,
   model: 'claude-sonnet-5',
   modelDedup: 'claude-haiku-4-5',
   effortStage1: 'high',
@@ -193,6 +201,13 @@ export async function writeConfig(next: Partial<Config>): Promise<Config> {
   // Guard the two that can quietly break a run rather than just make it worse.
   if (merged.duplicateGrey >= merged.duplicateCertain) {
     throw new Error('duplicateGrey must be below duplicateCertain — otherwise the band is empty.');
+  }
+  // An empty or one-character marker would match half the note and silently flag everything.
+  if (merged.emphasisMarker.trim().length < 2) {
+    throw new Error('emphasisMarker needs at least two characters, or it will match by accident.');
+  }
+  if (!(merged.emphasisWeight >= 1)) {
+    throw new Error('emphasisWeight must be at least 1 — below that, flagging would demote.');
   }
   if (merged.cardsPerTarget > merged.candidatesPerTarget) {
     throw new Error('cardsPerTarget cannot exceed candidatesPerTarget — there would be nothing to pick from.');

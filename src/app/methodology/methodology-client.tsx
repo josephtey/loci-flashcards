@@ -56,6 +56,7 @@ const NUMERIC: (keyof Config)[] = [
   'duplicateCertain',
   'duplicateGrey',
   'coverageContext',
+  'emphasisWeight',
 ];
 
 export function MethodologyClient() {
@@ -334,7 +335,7 @@ export function MethodologyClient() {
               </label>
             ))}
 
-            {(['model', 'modelDedup'] as const).map((k) => (
+            {(['emphasisMarker', 'model', 'modelDedup'] as const).map((k) => (
               <label key={k} className="flex items-baseline gap-4">
                 <input
                   value={config[k]}

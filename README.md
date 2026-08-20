@@ -51,6 +51,12 @@ The snapshot is committed **per note, after that note has been extracted from**.
 front means a run that's cancelled or crashes halfway leaves every note it never reached looking
 already-read, and the next sync passes over them in silence.
 
+**Flagging beats guessing.** Writing `***` beside a passage marks it as load-bearing: the sweep
+covers it more thoroughly and the note's target budget grows to make room, so a flagged paragraph
+earns several cards where its neighbours earn one. Choosing what deserves a prompt is the judgement
+the model is worst at, and this is the cheapest channel for overriding it. The marker and how much
+it is worth are both tunable from `/methodology`.
+
 **Stage 1 proposes targets, not cards.** A target is a span plus an *angle* — which of thirteen
 lenses on that span is worth reinforcing. Choosing what deserves a prompt is much harder than
 writing a prompt about a chosen detail, so the two are separated. The count is proportional to how

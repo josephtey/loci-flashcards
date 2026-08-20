@@ -149,7 +149,8 @@ async function main() {
       } else {
         log(
           `  ${GREEN}✓${RESET}  ${n.title} ${DIM}· ${n.targets} target${n.targets === 1 ? '' : 's'}, ` +
-            `${n.cards} card${n.cards === 1 ? '' : 's'}${RESET}`,
+            `${n.cards} card${n.cards === 1 ? '' : 's'}${RESET}` +
+            (n.flagged ? ` ${YELLOW}· ${n.flagged} flagged${RESET}` : ''),
         );
       }
     }
