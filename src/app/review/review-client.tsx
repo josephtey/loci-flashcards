@@ -229,7 +229,7 @@ export function Review({ cards, mode }: SessionProps) {
   const answer = isCloze ? renderCloze(card.cloze_text!, true) : (local?.back ?? card.back);
 
   return (
-    <main className="safe-b mx-auto flex min-h-dvh max-w-3xl flex-col px-5 py-6 sm:px-8 sm:py-10">
+    <main className="safe-b mx-auto flex min-h-dvh max-w-3xl flex-col px-5 pt-6 pb-14 sm:px-8 sm:py-10">
       <header className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
           <HomeButton />
