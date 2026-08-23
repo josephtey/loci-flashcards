@@ -189,7 +189,7 @@ export function CardsClient({
 
 
   return (
-    <main className="safe-b mx-auto flex h-dvh max-w-5xl flex-col px-5 py-6 sm:px-8 sm:py-8">
+    <main className="safe-b safe-t mx-auto flex h-dvh max-w-5xl flex-col px-5 pb-6 sm:px-8 sm:pb-8 sm:[--safe-t-base:2rem]">
       <header className="flex shrink-0 flex-wrap items-baseline justify-between gap-4">
         <div>
           <HomeButton />

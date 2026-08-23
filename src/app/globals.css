@@ -213,6 +213,11 @@ a,
 .safe-b {
   padding-bottom: max(env(safe-area-inset-bottom), 0px);
 }
+/* Top padding that grows by the status-bar inset. Pages set their own base via --safe-t-base
+   (Tailwind: `[--safe-t-base:2.5rem]`); in a normal browser tab the inset is 0 and nothing moves. */
+.safe-t {
+  padding-top: calc(var(--safe-t-base, 1.5rem) + env(safe-area-inset-top, 0px));
+}
 .safe-x {
   padding-left: max(env(safe-area-inset-left), 0px);
   padding-right: max(env(safe-area-inset-right), 0px);

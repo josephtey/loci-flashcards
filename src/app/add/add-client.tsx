@@ -196,7 +196,7 @@ export function AddClient() {
   }
 
   return (
-    <main className="safe-b mx-auto flex min-h-dvh max-w-3xl flex-col px-5 py-6 sm:px-8 sm:py-10">
+    <main className="safe-b safe-t mx-auto flex min-h-dvh max-w-3xl flex-col px-5 pb-6 sm:px-8 sm:pb-10 sm:[--safe-t-base:2.5rem]">
       {status === 'reviewing' && drafts.length > 0 && (
         <QuickReview
           cards={drafts}
