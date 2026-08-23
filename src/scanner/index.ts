@@ -26,7 +26,7 @@ async function main() {
 
   // --local  every stage on Ollama; LOCI_LOCAL_MODEL picks the model.
   if (args.has('--local')) {
-    const local = process.env.LOCI_LOCAL_MODEL ?? 'gemma4:12b-it-qat';
+    const local = process.env.LOCI_LOCAL_MODEL ?? 'qwen3.5:9b';
     process.env.LOCI_MODEL ??= local;
     process.env.LOCI_MODEL_DEDUP ??= local;
   }
