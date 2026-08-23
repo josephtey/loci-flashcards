@@ -92,7 +92,6 @@ async function call<T>(
     cache_read_input_tokens?: number | null;
   };
 }> {
-  // Anything that isn't a Claude model is assumed to be served by Ollama — see ollama.ts.
   if (isLocalModel(params.model)) return callOllama<T>(stage, params);
 
   const stream = anthropic().messages.stream(params);
@@ -164,7 +163,7 @@ function addUsage(
 export function estimateCost(u: Usage): number {
   let total = 0;
   for (const [model, m] of Object.entries(u.byModel)) {
-    if (isLocalModel(model)) continue; // your electricity, not a bill
+    if (isLocalModel(model)) continue;
     const [inRate, outRate] = PRICING[model] ?? PRICING['claude-sonnet-5'];
     total +=
       (m.input * inRate) / 1e6 +

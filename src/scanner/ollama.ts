@@ -1,27 +1,14 @@
 import type Anthropic from '@anthropic-ai/sdk';
 
 /**
- * Run a stage on a local model through Ollama instead of the Anthropic API.
- *
- * Everything in the pipeline is built on structured outputs — a Zod schema the model must fill
- * in — and Ollama's Anthropic-compatible endpoint ignores `output_config.format`, so pointing the
- * SDK at it produces unparseable answers. Its native `/api/chat` endpoint, on the other hand, takes
- * a JSON schema as `format` and constrains decoding to it, which is a stronger guarantee than the
- * prompt-and-hope approach. So this talks to Ollama directly and hands back the same shape `call`
- * returns: the parsed object plus token counts.
- *
- * Routing is by model name. Anything that isn't `claude-*` comes here, so
- * `LOCI_MODEL=gemma4:12b-it-qat npm run scan` is the whole switch — or `npm run scan:local`.
- *
- * Quality caveat, stated once: a 12B model writes noticeably weaker targets and prompts than
- * Sonnet, and the judge stage is only as good as the model judging. Worth it for experiments and
- * for running the nightly sweep for free; check the cards it writes before trusting it with a
- * large batch.
+ * Local models via Ollama's native /api/chat. The stage's JSON schema goes in as `format` so the
+ * structured output survives; the Anthropic-compatible endpoint ignores output_config.format.
+ * Any model that isn't `claude-*` is routed here.
  */
 
 const OLLAMA_URL = () => (process.env.OLLAMA_URL ?? 'http://localhost:11434').replace(/\/$/, '');
 
-/** Context window to request. Ollama's default (4k) silently truncates the stage-1 prompt. */
+// Ollama's 4k default would truncate the stage-1 prompt.
 const NUM_CTX = () => Number(process.env.LOCI_OLLAMA_CTX ?? 32768);
 
 export function isLocalModel(model: string): boolean {
@@ -41,7 +28,6 @@ interface OllamaChunk {
 
 const capabilityCache = new Map<string, Promise<Set<string>>>();
 
-/** `ollama show`, once per model per process — used to decide whether to ask it to think. */
 function capabilities(model: string): Promise<Set<string>> {
   let p = capabilityCache.get(model);
   if (!p) {
@@ -97,8 +83,7 @@ export async function callOllama<T>(
     options: { num_ctx: NUM_CTX(), num_predict: params.max_tokens, temperature: 0.3 },
   };
 
-  // One retry: constrained decoding makes malformed JSON rare, but a model can still violate an
-  // enum or leave a required field out of a nested object, and Zod will say so.
+  // One retry on a schema mismatch.
   let lastError: unknown;
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(`${OLLAMA_URL()}/api/chat`, {

@@ -24,8 +24,7 @@ async function main() {
   const args = new Set(argv);
   const dryRun = args.has('--dry') || args.has('--sync-only');
 
-  // --local  run every stage on a local model through Ollama (see ollama.ts). LOCI_LOCAL_MODEL
-  //          picks the model; LOCI_MODEL / LOCI_MODEL_DEDUP still win if set explicitly.
+  // --local  every stage on Ollama; LOCI_LOCAL_MODEL picks the model.
   if (args.has('--local')) {
     const local = process.env.LOCI_LOCAL_MODEL ?? 'gemma4:12b-it-qat';
     process.env.LOCI_MODEL ??= local;
