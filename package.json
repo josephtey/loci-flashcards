@@ -9,6 +9,7 @@
     "lint": "eslint",
     "scan": "tsx src/scanner/index.ts",
     "scan:dry": "tsx src/scanner/index.ts --dry",
+    "scan:local": "tsx src/scanner/index.ts --local",
     "typecheck": "tsc --noEmit",
     "doctor": "tsx src/scanner/doctor.ts",
     "reset": "tsx src/scanner/reset.ts"

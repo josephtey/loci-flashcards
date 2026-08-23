@@ -199,6 +199,25 @@ skipping it.
 
 ---
 
+## Running it on a local model
+
+```sh
+npm run scan:local                       # every stage on Ollama, default gemma4:12b-it-qat
+LOCI_LOCAL_MODEL=gemma4:27b npm run scan:local
+LOCI_MODEL=gemma4:12b-it-qat npm run scan   # equivalent; any non-claude-* model routes to Ollama
+```
+
+Any model name that isn't `claude-*` is sent to Ollama's native `/api/chat` (`OLLAMA_URL`, default
+`http://localhost:11434`) with the stage's JSON schema as `format`, so decoding is constrained to
+the shape the pipeline expects — the Anthropic-compatible endpoint can't do that. Thinking is
+turned on when the model supports it (`LOCI_OLLAMA_THINK=0` to skip it, roughly 2× faster); the
+context window is requested at 32k (`LOCI_OLLAMA_CTX`), because Ollama's 4k default would
+silently truncate the stage-1 prompt. Local runs are priced at $0 in the summary.
+
+Expect it to be slow and a notch worse. On an M4 Pro, Gemma 4 12B takes ~3 minutes for stage 1 on a
+350-word note against ~30 seconds for Sonnet, and its rationales are flatter. Fine for a nightly
+sweep you don't pay for; check the first batch of cards before trusting it with a backlog.
+
 ## Cost and tuning
 
 `claude-sonnet-5` for stages 1–3, `claude-haiku-4-5` for deduplication. A full sweep of 92 notes

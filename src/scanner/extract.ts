@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
+import { callOllama, isLocalModel } from './ollama';
 import * as z from 'zod';
 import { newCardState } from '../lib/fsrs';
 import { readConfig, type Config } from '../lib/prompt-store';
@@ -91,6 +92,9 @@ async function call<T>(
     cache_read_input_tokens?: number | null;
   };
 }> {
+  // Anything that isn't a Claude model is assumed to be served by Ollama — see ollama.ts.
+  if (isLocalModel(params.model)) return callOllama<T>(stage, params);
+
   const stream = anthropic().messages.stream(params);
   const message = await stream.finalMessage();
 
@@ -160,6 +164,7 @@ function addUsage(
 export function estimateCost(u: Usage): number {
   let total = 0;
   for (const [model, m] of Object.entries(u.byModel)) {
+    if (isLocalModel(model)) continue; // your electricity, not a bill
     const [inRate, outRate] = PRICING[model] ?? PRICING['claude-sonnet-5'];
     total +=
       (m.input * inRate) / 1e6 +
@@ -332,7 +337,7 @@ async function checkDuplicate(
 ) {
   // Haiku 4.5 predates adaptive thinking and rejects `effort` outright, so the dedup call carries
   // neither. It doesn't need them: this is a single binary comparison, not a reasoning task.
-  const cheap = MODEL_DEDUP.startsWith('claude-haiku');
+  const cheap = MODEL_DEDUP.startsWith('claude-haiku') || isLocalModel(MODEL_DEDUP);
 
   const { parsed, usage: u } = await call<z.infer<typeof zEquivalence>>('dedup', {
     model: MODEL_DEDUP,
