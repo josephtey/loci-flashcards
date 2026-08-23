@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   // Reviewing happens on a phone as often as a laptop, so it should sit on the home screen and
   // open without browser chrome.
   appleWebApp: { capable: true, title: 'Loci', statusBarStyle: 'black-translucent' },
+  manifest: '/manifest.webmanifest',
+  icons: { apple: '/apple-touch-icon.png' },
 };
 
 export const viewport: Viewport = {
