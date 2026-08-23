@@ -1,17 +1,15 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { isAuthenticated, mustRefuse } from '@/lib/auth';
+import { isAuthenticated } from '@/lib/auth';
 
 /**
- * The front door. Every page and API route passes through here; only the login page, the login
- * endpoint, and the static bits a home-screen install needs (manifest, icons) are exempt.
+ * The front door, when there is one. With `LOCI_PASSWORD` unset this passes everything through.
+ * With it set, every page and API route is gated; only the login page, the login endpoint, and
+ * the static bits a home-screen install needs (manifest, icons) are exempt.
  *
  * Pages redirect to /login; API routes get a 401 — a fetch from the review screen should fail
  * loudly rather than receive an HTML login form as its JSON.
  */
 export async function proxy(req: NextRequest) {
-  if (mustRefuse()) {
-    return new NextResponse('LOCI_PASSWORD is not set on this deployment.', { status: 500 });
-  }
   if (await isAuthenticated(req)) return NextResponse.next();
 
   const { pathname } = req.nextUrl;

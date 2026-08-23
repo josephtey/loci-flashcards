@@ -172,11 +172,11 @@ fine hosted, since they only need Postgres.
 Prompts are also read-only when hosted: the filesystem is, so `/methodology` shows them but can't
 save. Edit them in the repo, or locally.
 
-Set `LOCI_PASSWORD` on the hosted copy. Every page and API route sits behind it — one password,
+The hosted copy is open by default. If you'd rather keep the deck to yourself, set
+`LOCI_PASSWORD` on the deployment: every page and API route then sits behind it — one password,
 one cookie that lasts a year per device, a `Bearer` header for anything that isn't a browser.
-Leave it unset locally and nothing is gated. Then on the phone: Safari → Share → **Add to Home
-Screen**. The manifest and icons are in place, so it installs with its own icon and opens
-fullscreen.
+On the phone: Safari → Share → **Add to Home Screen**. The manifest and icons are in place, so it
+installs with its own icon and opens fullscreen.
 
 ---
 

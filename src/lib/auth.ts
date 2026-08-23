@@ -7,8 +7,8 @@
  * is worth exactly as much as the password it came from — no more, since it never leaves the
  * server except as an httpOnly cookie.
  *
- * Locally, with `LOCI_PASSWORD` unset, nothing is gated — `npm run dev` behaves as it always has.
- * On Vercel with it unset, everything is refused rather than silently left open.
+ * The gate is opt-in: with `LOCI_PASSWORD` unset nothing is gated, hosted or local. Set it on the
+ * deployment if you ever want the deck to yourself; every device then logs in once.
  *
  * Web Crypto rather than `node:crypto` because this also runs in the proxy, which may be deployed
  * at the edge.
@@ -19,11 +19,6 @@ export const SESSION_MAX_AGE = 60 * 60 * 24 * 365; // a year — log in once per
 
 export function passwordConfigured(): boolean {
   return Boolean(process.env.LOCI_PASSWORD);
-}
-
-/** Hosted without a password is a misconfiguration, not an open door. */
-export function mustRefuse(): boolean {
-  return !passwordConfigured() && Boolean(process.env.VERCEL);
 }
 
 async function sha256Hex(input: string): Promise<string> {
@@ -58,7 +53,7 @@ export async function passwordMatches(candidate: string): Promise<boolean> {
  * password (a future native client, or curl).
  */
 export async function isAuthenticated(req: { headers: Headers; cookies: { get(name: string): { value: string } | undefined } }): Promise<boolean> {
-  if (!passwordConfigured()) return !mustRefuse();
+  if (!passwordConfigured()) return true;
 
   const expected = await sessionToken();
   const cookie = req.cookies.get(SESSION_COOKIE)?.value;
