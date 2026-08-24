@@ -17,5 +17,5 @@
   "effortStage3": "high",
   "effortQuickAdd": "medium",
   "graderAutoAccept": false,
-  "provider": "claude"
+  "provider": "ollama"
 }

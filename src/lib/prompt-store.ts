@@ -73,9 +73,10 @@ export type PromptKey = keyof typeof PROMPT_FILES;
  * flow all follow it. `claude` is Anthropic's API; `ollama` is Ollama's hosted service, which
  * means `gpt-oss:120b` and nothing else.
  *
- * `claude` is the default and the only one shown to write good cards — see the comparison in the
- * README. Switch it, scan one note with `--paths`, and read what comes out before trusting it
- * with the vault.
+ * `ollama` is the default: it is free, and on grading it matches a human (18/18 on the
+ * benchmark). Extraction is the weaker half — measured against Sonnet on the same note it found
+ * 6 targets to 14, and some excerpts came back paraphrased rather than quoted. Switch to
+ * `claude` for a scan you care about, and read what a scan produces either way.
  */
 export const PROVIDERS = ['claude', 'ollama'] as const;
 export type ProviderName = (typeof PROVIDERS)[number];
@@ -157,7 +158,7 @@ export const DEFAULT_CONFIG: Config = {
   effortStage3: 'high',
   effortQuickAdd: 'medium',
   graderAutoAccept: false,
-  provider: 'claude',
+  provider: 'ollama',
 };
 
 /** Where the editable prompts live, relative to the app root. */
