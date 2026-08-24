@@ -119,6 +119,31 @@ the home indicator. Add it to the home screen and it opens without browser chrom
 **Every prompt is editable at runtime** from `/methodology` — the files in `prompts/` are read from
 disk per run, not baked into the build. So is the tuning in `prompts/config.json`.
 
+### Two ways to answer
+
+Every session has a toggle in its top-right corner.
+
+**self** is the original flow: reveal the answer, decide for yourself how well it came back.
+
+**type it** asks you to write the answer first, and a small Qwen model running locally through
+Ollama scores it into the same four grades. It exists because it is impossible to think *"I knew
+that"* at a blank screen and be wrong — self-grading measures confidence, and typing measures
+recall.
+
+The grade is a **proposal, not a verdict**. It appears alongside the real answer with the model's
+reasoning and whatever it thought you missed, with its pick outlined on the grade buttons.
+`↵` accepts it, `1`–`4` overrides it, and nothing is written until you do one or the other. Every
+review records both numbers, so `grader_rating <> rating` is the running list of places the
+auto-grader is wrong, with the answer that fooled it in the same row. Flip `graderAutoAccept` in
+`/methodology` once the disagreements stop being interesting.
+
+Cards with no reference answer — the open, catechism-style ones — always fall back to self-grading.
+A grader with nothing to compare against is guessing, and its guesses would land in the very log
+being used to judge it. `s` hands any other card back to you too.
+
+The model runs **on your machine**: no per-card cost, no network, and nothing you type leaves the
+laptop. See [Recall mode](#4-recall-mode) for setup.
+
 ---
 
 ## Setup
@@ -162,12 +187,92 @@ with `--request "<what to extract>"` for a targeted run, `--force` to re-extract
 snapshot (what you want after editing the prompts, when the vault hasn't changed but the output
 would), and `--cron`.
 
-### 4. Hosting
+### 4. Recall mode
+
+Optional — the deck works without it, and the **type it** toggle simply stays greyed out with a
+reason. To turn it on:
+
+```sh
+brew install --cask ollama-app    # the app bundle, NOT `brew install ollama`
+open -a Ollama                    # click through the first-run screen once
+ollama pull qwen3.5:4b            # 3.4GB
+```
+
+Use the **cask**, not the formula. The Homebrew formula ships a 60MB CPU-only binary — it works,
+and it is roughly ten times slower, because it never touches Metal. `ollama ps` tells you which
+one you have: it should say `100% GPU`, not `100% CPU`.
+
+`qwen3.5:4b` is the default because it was measured, not guessed:
+
+| model | agrees with a human | median |
+|---|---|---|
+| **qwen3.5:4b** | **17/18** | ~2.9s |
+| qwen3.5:2b | 11/17 | ~1.3s |
+
+2b is twice as fast and not safe — it scored a flatly wrong answer as *Good*, which is the one
+failure mode that matters, since it schedules a misconception as if you knew it. Change the model
+in `/methodology` (`graderModel`) if you want to try `qwen3.5:9b` on a bigger machine.
+
+The rubric that does the grading is `prompts/grade-answer.md`, editable from `/methodology` like
+every other prompt. It is prose, and prose has no tests, so measure what an edit did:
+
+```sh
+npm run bench:grade              # the default model
+npm run bench:grade qwen3.5:9b   # or any other
+```
+
+The first draft of that rubric scored 15/17 *and gave every correct answer an Easy* — which would
+have quietly stretched every interval in the deck. Nothing surfaced it except running this.
+
+#### Hosted (Vercel)
+
+There is no laptop inside a Vercel function, so `127.0.0.1:11434` is nothing and the toggle greys
+out. Point it at Ollama's hosted service instead — three env vars, no other change:
+
+```
+OLLAMA_HOST=https://ollama.com
+OLLAMA_API_KEY=<from https://ollama.com/settings/keys>
+OLLAMA_MODEL=gpt-oss:120b
+```
+
+`OLLAMA_MODEL` is needed because `prompts/config.json` is committed and read-only when hosted, so
+`graderModel` can't be changed there — and the local default doesn't exist on the cloud.
+
+**This works on the free tier**, which was worth measuring rather than assuming:
+
+| model | tier | agrees | median |
+|---|---|---|---|
+| **gpt-oss:120b** | **free** | **18/18** | **~0.7s** |
+| qwen3.5:4b (local) | — | 17/18 | ~2.9s |
+| nemotron-3-nano:30b | free | 13/18 | ~0.8s |
+| qwen3.5:397b | Pro, $20/mo | untested — needs a subscription | |
+
+Two gotchas the code already handles, both found by measuring:
+
+- **ollama.com does not compile the `format` grammar.** A schema-constrained request comes back as
+  prose (`**Score: 1** – the response does not…`), so `src/lib/grader.ts` states the JSON contract
+  in words as well and parses tolerantly. Local Ollama enforces the schema; the cloud does not.
+- **Free-tier calls can cold-start.** A typical grade is under a second, but one measured call took
+  42 — so the request timeout is 25s local, 75s hosted.
+
+Free-tier usage resets on rolling 5-hour and 7-day windows, so a very heavy session could hit a
+limit; a grade that fails for any reason falls back to self-grading that one card rather than
+losing it. `gpt-oss:120b` is not Qwen — Qwen on the cloud needs the $20/mo Pro tier. If you
+subscribe, one command tells you whether it is worth it:
+
+```sh
+OLLAMA_HOST=https://ollama.com npm run bench:grade qwen3.5:397b
+```
+
+### 5. Hosting
 
 The web app deploys anywhere. The two features that read the vault — **Sync with Obsidian** and
 **Draft with AI** — need the markdown on the same machine, so a hosted copy greys them out and
 says why rather than failing. Reviewing, browsing, editing and writing cards by hand all work
 fine hosted, since they only need Postgres.
+
+Recall mode works hosted too, but only if you point it somewhere — see
+[Hosted (Vercel)](#hosted-vercel). Left alone it greys out like the vault features do.
 
 Prompts are also read-only when hosted: the filesystem is, so `/methodology` shows them but can't
 save. Edit them in the repo, or locally.
@@ -219,8 +324,9 @@ time, which is why stage 3 exists.
 docs/prompt-principles.md   design spec; §2–4 injected verbatim into the extractor
 prompts/                    every extraction prompt, editable at runtime
 supabase/migrations/        schema
-src/scanner/                local CLI — vault, blocks, sync, prompts, extract, doctor, reset
-src/lib/                    types, supabase client, FSRS wrapper, queries, goals
+src/scanner/                local CLI — vault, blocks, sync, prompts, extract, doctor, reset,
+                            grade-bench (measures a rubric edit against known-good gradings)
+src/lib/                    types, supabase client, FSRS wrapper, queries, goals, grader
 src/app/api/                scan control, review grading, card CRUD, sync preview/result/log
 src/components/             review session, sync modal, activity graph, day detail
 ```
@@ -228,4 +334,5 @@ src/components/             review session, sync modal, activity graph, day deta
 `reviews` is append-only and is the actual asset. Everything else is derived from it. With the
 full log the FSRS parameters can be re-fit to your own history after ~200 reviews, or the whole
 deck replayed through a different scheduler; with only `next_due` you'd be locked to today's
-weights forever.
+weights forever. Recall mode widens that same row rather than adding a table of its own: the
+typed answer and the grade the model wanted sit next to the grade that was actually scheduled.

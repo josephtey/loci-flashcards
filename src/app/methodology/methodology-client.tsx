@@ -59,6 +59,77 @@ const NUMERIC: (keyof Config)[] = [
   'emphasisWeight',
 ];
 
+/**
+ * One collapsible prompt, with its editor.
+ *
+ * Three sections render this — the four pipeline stages, the shared principles, and the recall
+ * grader — and they had drifted into two near-identical copies before the third arrived.
+ */
+function PromptRow({
+  prompt,
+  open,
+  draft,
+  setDraft,
+  saving,
+  saved,
+  onToggle,
+  onSave,
+  onCancel,
+  footnote,
+}: {
+  prompt: Prompt;
+  open: boolean;
+  draft: string;
+  setDraft: (v: string) => void;
+  saving: boolean;
+  saved: boolean;
+  onToggle: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  footnote?: string;
+}) {
+  return (
+    <div>
+      <button onClick={onToggle} className="group flex w-full items-baseline gap-3 py-1.5 text-left">
+        <span className="font-mono text-[0.625rem] text-ink-4">{open ? '−' : '+'}</span>
+        <span className="text-sm text-ink-2 group-hover:text-ink">{prompt.title}</span>
+        <span className="flex-1 truncate font-mono text-[0.625rem] text-ink-4">{prompt.file}</span>
+        {saved && <span className="text-[0.6875rem] text-ink-3">saved</span>}
+      </button>
+
+      {open && (
+        <div className="rise mt-2">
+          {prompt.body === null && (
+            <p className="mb-2 rounded border border-mem-fresh/40 px-3 py-2 text-xs leading-relaxed text-mem-fresh">
+              This file could not be read from disk, so the box below is empty — saving would
+              overwrite it. Check the server log for the path it tried.
+            </p>
+          )}
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            spellCheck={false}
+            className="h-96 w-full resize-y rounded border border-ink-4 bg-surface p-4 font-mono text-[0.6875rem] leading-relaxed text-ink-2"
+          />
+          <div className="mt-2 flex items-center gap-4">
+            <button
+              onClick={onSave}
+              disabled={saving || !draft.trim()}
+              className="rounded border border-ink-4 px-3 py-1.5 text-xs text-ink-2 hover:border-ink-2 hover:text-ink disabled:opacity-30"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+            <button onClick={onCancel} className="text-xs text-ink-3 hover:text-ink">
+              Cancel
+            </button>
+            {footnote && <span className="ml-auto text-[0.6875rem] text-ink-4">{footnote}</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function MethodologyClient() {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [config, setConfig] = useState<Config | null>(null);
@@ -174,52 +245,19 @@ export function MethodologyClient() {
                 const p = byKey(key);
                 if (!p) return null;
                 return (
-                  <div key={key}>
-                    <button
-                      onClick={() => edit(key)}
-                      className="group flex w-full items-baseline gap-3 py-1.5 text-left"
-                    >
-                      <span className="font-mono text-[0.625rem] text-ink-4">
-                        {open === key ? '−' : '+'}
-                      </span>
-                      <span className="text-sm text-ink-2 group-hover:text-ink">{p.title}</span>
-                      <span className="flex-1 truncate font-mono text-[0.625rem] text-ink-4">
-                        {p.file}
-                      </span>
-                      {saved === key && (
-                        <span className="text-[0.6875rem] text-ink-3">saved</span>
-                      )}
-                    </button>
-
-                    {open === key && (
-                      <div className="rise mt-2">
-                        <textarea
-                          value={draft}
-                          onChange={(e) => setDraft(e.target.value)}
-                          spellCheck={false}
-                          className="h-96 w-full resize-y rounded border border-ink-4 bg-surface p-4 font-mono text-[0.6875rem] leading-relaxed text-ink-2"
-                        />
-                        <div className="mt-2 flex items-center gap-4">
-                          <button
-                            onClick={() => void savePrompt()}
-                            disabled={saving || !draft.trim()}
-                            className="rounded border border-ink-4 px-3 py-1.5 text-xs text-ink-2 hover:border-ink-2 hover:text-ink disabled:opacity-30"
-                          >
-                            {saving ? 'Saving…' : 'Save'}
-                          </button>
-                          <button
-                            onClick={() => setOpen(null)}
-                            className="text-xs text-ink-3 hover:text-ink"
-                          >
-                            Cancel
-                          </button>
-                          <span className="ml-auto text-[0.6875rem] text-ink-4">
-                            takes effect on the next scan
-                          </span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <PromptRow
+                    key={key}
+                    prompt={p}
+                    open={open === key}
+                    draft={draft}
+                    setDraft={setDraft}
+                    saving={saving}
+                    saved={saved === key}
+                    onToggle={() => edit(key)}
+                    onSave={() => void savePrompt()}
+                    onCancel={() => setOpen(null)}
+                    footnote="takes effect on the next scan"
+                  />
                 );
               })}
             </div>
@@ -241,54 +279,56 @@ export function MethodologyClient() {
             const p = byKey('principles');
             if (!p) return null;
             return (
-              <div>
-                <button
-                  onClick={() => edit('principles')}
-                  className="group flex w-full items-baseline gap-3 py-1.5 text-left"
-                >
-                  <span className="font-mono text-[0.625rem] text-ink-4">
-                    {open === 'principles' ? '−' : '+'}
-                  </span>
-                  <span className="text-sm text-ink-2 group-hover:text-ink">{p.title}</span>
-                  <span className="flex-1 truncate font-mono text-[0.625rem] text-ink-4">
-                    {p.file}
-                  </span>
-                  {saved === 'principles' && (
-                    <span className="text-[0.6875rem] text-ink-3">saved</span>
-                  )}
-                </button>
-                {open === 'principles' && (
-                  <div className="rise mt-2">
-                    {byKey('principles')?.body === null && (
-                      <p className="mb-2 rounded border border-mem-fresh/40 px-3 py-2 text-xs leading-relaxed text-mem-fresh">
-                        This file could not be read from disk, so the box below is empty — saving
-                        would overwrite it. Check the server log for the path it tried.
-                      </p>
-                    )}
-                    <textarea
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      spellCheck={false}
-                      className="h-96 w-full resize-y rounded border border-ink-4 bg-surface p-4 font-mono text-[0.6875rem] leading-relaxed text-ink-2"
-                    />
-                    <div className="mt-2 flex items-center gap-4">
-                      <button
-                        onClick={() => void savePrompt()}
-                        disabled={saving || !draft.trim()}
-                        className="rounded border border-ink-4 px-3 py-1.5 text-xs text-ink-2 hover:border-ink-2 hover:text-ink disabled:opacity-30"
-                      >
-                        {saving ? 'Saving…' : 'Save'}
-                      </button>
-                      <button
-                        onClick={() => setOpen(null)}
-                        className="text-xs text-ink-3 hover:text-ink"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <PromptRow
+                prompt={p}
+                open={open === 'principles'}
+                draft={draft}
+                setDraft={setDraft}
+                saving={saving}
+                saved={saved === 'principles'}
+                onToggle={() => edit('principles')}
+                onSave={() => void savePrompt()}
+                onCancel={() => setOpen(null)}
+              />
+            );
+          })()}
+        </div>
+      </section>
+
+      {/* Recall grading. Not a pipeline stage — it runs while you review, on your own machine,
+          and it is the one prompt here whose output changes the schedule rather than the deck. */}
+      <section className="mt-16 border-t border-ink-4 pt-10">
+        <h2 className="text-base font-light">Grading what you type</h2>
+        <p className="mt-3 text-sm leading-relaxed text-ink-3">
+          In <span className="text-ink-2">type it</span> mode a review asks you to write the
+          answer, and a small Qwen model running locally through Ollama scores it into the same
+          four grades. It costs nothing per card and never leaves the laptop. The grade is a
+          proposal — it is shown with its reasoning, and you accept or override it before anything
+          is written, which is what makes the disagreements worth keeping.
+        </p>
+        <p className="mt-3 text-sm leading-relaxed text-ink-3">
+          This rubric is the whole grader. Edit it, then run{' '}
+          <code className="font-mono text-[0.6875rem] text-ink-2">npm run bench:grade</code> to see
+          what the edit did — prose has no tests, and a reworded rubric silently reschedules the
+          deck.
+        </p>
+        <div className="mt-4">
+          {(() => {
+            const p = byKey('grade-answer');
+            if (!p) return null;
+            return (
+              <PromptRow
+                prompt={p}
+                open={open === 'grade-answer'}
+                draft={draft}
+                setDraft={setDraft}
+                saving={saving}
+                saved={saved === 'grade-answer'}
+                onToggle={() => edit('grade-answer')}
+                onSave={() => void savePrompt()}
+                onCancel={() => setOpen(null)}
+                footnote="takes effect on the next card"
+              />
             );
           })()}
         </div>
@@ -335,7 +375,24 @@ export function MethodologyClient() {
               </label>
             ))}
 
-            {(['emphasisMarker', 'model', 'modelDedup'] as const).map((k) => (
+            {/* The only boolean knob. Rendered as a checkbox rather than squeezed into the
+                text-input list, where `true`/`false` would be a typo away from meaning nothing. */}
+            <label className="flex items-baseline gap-4">
+              <span className="flex w-20 shrink-0 justify-end">
+                <input
+                  type="checkbox"
+                  checked={config.graderAutoAccept}
+                  onChange={(e) => void saveConfig({ graderAutoAccept: e.target.checked })}
+                  className="h-3.5 w-3.5 accent-current"
+                />
+              </span>
+              <span className="w-44 shrink-0 font-mono text-[0.6875rem] text-ink-2">
+                graderAutoAccept
+              </span>
+              <span className="text-xs leading-relaxed text-ink-3">{labels.graderAutoAccept}</span>
+            </label>
+
+            {(['emphasisMarker', 'model', 'modelDedup', 'graderModel'] as const).map((k) => (
               <label key={k} className="flex items-baseline gap-4">
                 <input
                   value={config[k]}

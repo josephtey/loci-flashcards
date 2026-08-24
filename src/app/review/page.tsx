@@ -1,11 +1,15 @@
 import Link from 'next/link';
+import { graderStatus } from '@/lib/grader';
+import { readConfig } from '@/lib/prompt-store';
 import { dueCards } from '@/lib/queries';
 import { Review } from './review-client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ReviewPage() {
-  const cards = await dueCards();
+  // Asked on every load rather than cached: Ollama is a process on a laptop, and whether it was
+  // running when the last page rendered says nothing about whether it is running now.
+  const [cards, grader, config] = await Promise.all([dueCards(), graderStatus(), readConfig()]);
 
   if (!cards.length) {
     return (
@@ -18,5 +22,7 @@ export default async function ReviewPage() {
     );
   }
 
-  return <Review cards={cards} mode="review" />;
+  return (
+    <Review cards={cards} mode="review" grader={grader} autoAccept={config.graderAutoAccept} />
+  );
 }

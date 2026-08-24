@@ -26,6 +26,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     still_endorse?: StillEndorse;
     duration_ms?: number;
     reason?: string;
+    // Recall mode. `rating` above is always Joseph's; these are what the local model proposed
+    // before he accepted or overrode it.
+    typed_answer?: string;
+    grader_rating?: RatingValue;
+    grader_verdict?: string;
+    grader_missing?: string;
+    grader_model?: string;
+    grader_ms?: number;
   };
   const db = supabase();
 
@@ -168,7 +176,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     })
     .eq('card_id', id);
 
-  await db.from('reviews').insert({
+  const review = {
     card_id: id,
     action: 'grade',
     rating: body.rating,
@@ -178,7 +186,32 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     duration_ms: body.duration_ms ?? null,
     scheduler: 'fsrs',
     scheduler_version: SCHEDULER_VERSION,
-  });
+  };
+
+  // Both numbers, always. `rating` is what was scheduled; `grader_rating` is what the model
+  // wanted. Rows where they differ are the record of where the auto-grader is wrong, and the
+  // typed answer sitting beside them is the evidence for why — which is the whole reason the
+  // model proposes rather than decides.
+  const graded = {
+    ...review,
+    typed_answer: body.typed_answer ?? null,
+    grader_rating: body.grader_rating ?? null,
+    grader_verdict: body.grader_verdict ?? null,
+    grader_missing: body.grader_missing ?? null,
+    grader_model: body.grader_model ?? null,
+    grader_ms: body.grader_ms ?? null,
+  };
+
+  // These columns arrive with migration 0006, and an insert naming a column that doesn't exist
+  // fails outright — which would mean a card you have already answered silently going unrecorded
+  // on an unmigrated database. The schedule has been written by this point either way, so losing
+  // the review row would leave the two disagreeing. Fall back to the row without them: the grade
+  // is the part that must never be dropped, and the calibration fields are the part that can wait.
+  const { error: insertError } = await db.from('reviews').insert(graded);
+  if (insertError?.message?.includes('column')) {
+    console.warn('reviews is missing the 0006 columns — logging the grade without the verdict.');
+    await db.from('reviews').insert(review);
+  }
 
   // A prompt you keep forgetting is a prompt that needs refactoring, not more repetitions.
   if (next.lapses >= LAPSE_LIMIT) {

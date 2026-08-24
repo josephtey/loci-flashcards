@@ -1,11 +1,13 @@
 import Link from 'next/link';
+import { graderStatus } from '@/lib/grader';
+import { readConfig } from '@/lib/prompt-store';
 import { newCards } from '@/lib/queries';
 import { Review } from '../review/review-client';
 
 export const dynamic = 'force-dynamic';
 
 export default async function NewPage() {
-  const cards = await newCards();
+  const [cards, grader, config] = await Promise.all([newCards(), graderStatus(), readConfig()]);
 
   if (!cards.length) {
     return (
@@ -18,5 +20,5 @@ export default async function NewPage() {
     );
   }
 
-  return <Review cards={cards} mode="new" />;
+  return <Review cards={cards} mode="new" grader={grader} autoAccept={config.graderAutoAccept} />;
 }

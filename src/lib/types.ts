@@ -237,6 +237,36 @@ export const RATING_LABELS: Record<RatingValue, string> = {
 export type StillEndorse = 'yes' | 'shifted' | 'no';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Auto-grading a typed answer
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * What the local model returns after reading a typed recall attempt.
+ *
+ * The field order is load-bearing, not cosmetic. Structured output constrains generation
+ * token by token in the order the schema declares, so a model that emits `rating` first has
+ * committed to a number before it has written a word about what happened — which is exactly
+ * the reasoning we want it to do. `verdict` and `missing` come first so the number is the
+ * conclusion of the thought rather than a guess the prose then rationalises.
+ */
+export const zRecallVerdict = z.object({
+  verdict: z.string().describe('One sentence, second person: what came back and what did not.'),
+  missing: z
+    .string()
+    .describe('The specific thing the answer left out, in a few words. Empty if nothing.'),
+  rating: z
+    .union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)])
+    .describe('1 Again, 2 Hard, 3 Good, 4 Easy.'),
+});
+export type RecallVerdict = z.infer<typeof zRecallVerdict>;
+
+/** A verdict plus what it cost to get, which is what the calibration view reads. */
+export interface GradeResult extends RecallVerdict {
+  model: string;
+  latency_ms: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Row shapes (hand-written rather than generated; the schema is small and stable)
 // ─────────────────────────────────────────────────────────────────────────────
 

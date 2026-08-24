@@ -11,7 +11,8 @@
     "scan:dry": "tsx src/scanner/index.ts --dry",
     "typecheck": "tsc --noEmit",
     "doctor": "tsx src/scanner/doctor.ts",
-    "reset": "tsx src/scanner/reset.ts"
+    "reset": "tsx src/scanner/reset.ts",
+    "bench:grade": "tsx src/scanner/grade-bench.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

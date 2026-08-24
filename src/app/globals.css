@@ -90,7 +90,14 @@ body {
   perspective: 1800px;
 }
 
+/* The two faces are stacked in a single grid cell rather than absolutely positioned.
+
+   With the back as `position: absolute; inset: 0` it was sized by the front, so any card whose
+   answer ran longer than its question had the answer overflowing the card — text sitting on the
+   page background below a card that had no idea it was too small. In one grid cell both faces
+   are in flow, and the container takes the height of the taller of the two. */
 .flip-inner {
+  display: grid;
   transform-style: preserve-3d;
   transition: transform 620ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -100,6 +107,7 @@ body {
 }
 
 .flip-face {
+  grid-area: 1 / 1;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }

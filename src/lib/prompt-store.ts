@@ -48,6 +48,14 @@ export const PROMPT_FILES = {
     file: 'dedup.md',
     role: 'Decides whether a candidate duplicates a card already in the deck.',
   },
+  'grade-answer': {
+    title: 'Grade a typed answer',
+    file: 'grade-answer.md',
+    role:
+      'Turns a typed recall attempt into one of the four grades. Runs on a small local model ' +
+      'rather than Claude, and none of the shared principles apply — this one is about ' +
+      'measuring retrieval, not writing prompts.',
+  },
   principles: {
     title: 'Principles',
     root: 'docs',
@@ -80,6 +88,8 @@ export interface Config {
   effortStage2: Effort;
   effortStage3: Effort;
   effortQuickAdd: Effort;
+  graderModel: string;
+  graderAutoAccept: boolean;
 }
 
 export const CONFIG_LABELS: Record<keyof Config, string> = {
@@ -102,6 +112,13 @@ export const CONFIG_LABELS: Record<keyof Config, string> = {
   effortStage2: 'Reasoning effort when writing cards.',
   effortStage3: 'Reasoning effort when judging.',
   effortQuickAdd: 'Reasoning effort for the one-pass Add cards flow. Lower is faster.',
+  graderModel:
+    'Ollama model that grades typed answers. Local and free — a 4B Qwen is plenty for comparing ' +
+    'an answer against a reference. Drop to qwen3.5:2b if it feels slow, raise to :9b if it ' +
+    'misjudges.',
+  graderAutoAccept:
+    'Commit the grade the moment the model returns it, instead of waiting for you to accept. ' +
+    'Leave this off until the verdicts have earned it.',
 };
 
 const CONFIG_FILE = 'config.json';
@@ -124,6 +141,8 @@ export const DEFAULT_CONFIG: Config = {
   effortStage2: 'high',
   effortStage3: 'high',
   effortQuickAdd: 'medium',
+  graderModel: 'qwen3.5:4b',
+  graderAutoAccept: false,
 };
 
 /** Where the editable prompts live, relative to the app root. */
@@ -208,6 +227,10 @@ export async function writeConfig(next: Partial<Config>): Promise<Config> {
   }
   if (!(merged.emphasisWeight >= 1)) {
     throw new Error('emphasisWeight must be at least 1 — below that, flagging would demote.');
+  }
+  // An empty model name would fail at grade time, one card into a session, as a network error.
+  if (!merged.graderModel.trim()) {
+    throw new Error('graderModel cannot be empty — it is the Ollama model that grades answers.');
   }
   if (merged.cardsPerTarget > merged.candidatesPerTarget) {
     throw new Error('cardsPerTarget cannot exceed candidatesPerTarget — there would be nothing to pick from.');
