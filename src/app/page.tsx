@@ -91,7 +91,7 @@ export default async function Home() {
                   {plan.done
                     ? `Everything due is cleared${plan.newGoal > 0 ? ` and today's ${plan.newGoal} new card${plan.newGoal === 1 ? '' : 's'} are in` : ''}.`
                     : `Everything due is cleared. ${plan.newLeft} new card${plan.newLeft === 1 ? '' : 's'} waiting if you want ${plan.newLeft === 1 ? 'it' : 'them'} — the day already counts either way.`}
-                  {a.streak > 0 && (
+                  {a.streak > 1 && (
                     <span className="text-ink-2">
                       {' '}
                       That&rsquo;s {a.streak} day{a.streak === 1 ? '' : 's'} in a row.

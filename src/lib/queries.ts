@@ -311,8 +311,11 @@ export interface Activity {
     /** Nothing left owed — or the daily cap was reached, which discharges the day either way. */
     met: boolean;
   }[];
+  /** Consecutive days you reviewed something, ending today or yesterday. */
   streak: number;
   longestStreak: number;
+  /** Every day you have ever reviewed anything. Only ever goes up. */
+  daysDone: number;
   todayReviews: number;
   todayLearned: number;
 }
@@ -334,7 +337,7 @@ export async function activity(): Promise<Activity> {
   const dayKey = (d: string | Date) =>
     (typeof d === 'string' ? new Date(d) : d).toLocaleDateString('en-CA');
 
-  const [{ data }, { data: states }] = await Promise.all([
+  const [{ data }, { data: states }, { data: allGrades }] = await Promise.all([
     db
       .from('reviews')
       .select('reviewed_at, state_before, action')
@@ -343,6 +346,10 @@ export async function activity(): Promise<Activity> {
     // Anything still sitting overdue is a debt that was never discharged — it has to count
     // against every day it was outstanding, not just today.
     db.from('card_states').select('due, reps, scheduled_days').gt('reps', 0),
+    // Every grade ever, one narrow column, so "days done" is a real all-time count rather than
+    // one that silently resets to a rolling year. The graph is windowed; this number should not
+    // be, because its whole job is to only ever go up.
+    db.from('reviews').select('reviewed_at').eq('action', 'grade'),
   ]);
 
   const byDay = new Map<string, { reviews: number; learned: number }>();
@@ -429,10 +436,25 @@ export async function activity(): Promise<Activity> {
   const began = days.findIndex((d) => d.reviews > 0 || d.owed > 0);
   for (let i = 0; i < (began === -1 ? days.length : began); i++) days[i].met = false;
 
-  // Today isn't over, so a day that hasn't been cleared *yet* shouldn't read as a broken streak.
+  /**
+   * Both counts are about *showing up*, not about ending the day with an empty queue.
+   *
+   * They used to be about `met` — a day with nothing left owed. That is a better description of
+   * keeping up, and it is unusable as a number: `met` is false whenever anything in the deck is
+   * overdue, and a card that came due last week is still overdue today, so one forgotten card
+   * marks every day since as a failure. Days you had actually worked through flipped to unmet
+   * because of something you hadn't touched — the past changing on the strength of the present.
+   * With 66 cards overdue and the oldest nine days old, the streak read zero on a day with
+   * reviews already in it.
+   *
+   * `owed` and `met` are still computed and still worth showing per-day in the graph, where
+   * "nothing was owed here" is genuine information. They are just no longer what the headline
+   * counts.
+   */
+  // Today isn't over, so a day you haven't got to *yet* shouldn't read as a broken streak.
   let streak = 0;
   for (let i = days.length - 1; i >= 0; i--) {
-    if (days[i].met) streak++;
+    if (days[i].reviews > 0) streak++;
     else if (i === days.length - 1) continue;
     else break;
   }
@@ -440,16 +462,20 @@ export async function activity(): Promise<Activity> {
   let longest = 0;
   let run = 0;
   for (const d of days) {
-    if (d.met) run++;
+    if (d.reviews > 0) run++;
     else run = 0;
     if (run > longest) longest = run;
   }
+
+  // Distinct local days across the whole history, not just the graph's window.
+  const everyDay = new Set((allGrades ?? []).map((r) => dayKey(r.reviewed_at as string)));
 
   const last = days[days.length - 1];
   return {
     days,
     streak,
     longestStreak: longest,
+    daysDone: everyDay.size,
     todayReviews: last?.reviews ?? 0,
     todayLearned: last?.learned ?? 0,
   };

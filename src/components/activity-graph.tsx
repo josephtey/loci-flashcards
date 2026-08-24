@@ -33,7 +33,7 @@ const FILL = [
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function ActivityGraph({ activity }: { activity: Activity }) {
-  const { days, streak, longestStreak, todayReviews, todayLearned } = activity;
+  const { days, streak, longestStreak, daysDone, todayReviews, todayLearned } = activity;
   const scroller = useRef<HTMLDivElement>(null);
   const [picked, setPicked] = useState<string | null>(null);
 
@@ -62,12 +62,21 @@ export function ActivityGraph({ activity }: { activity: Activity }) {
   return (
     <div className="w-full min-w-0">
       <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+        {/* Days done leads, because it is the number that only ever goes up. A streak is a
+            fragile thing to put in 24px — one travel week and the headline reads zero, which
+            says nothing true about the year behind it. */}
         <span className="text-2xl font-light tabular-nums">
-          {streak}
+          {daysDone}
           <span className="ml-2 text-xs uppercase tracking-[0.18em] text-ink-3">
-            day{streak === 1 ? '' : 's'} in a row
+            day{daysDone === 1 ? '' : 's'} done
           </span>
         </span>
+        {streak > 0 && (
+          <span className="text-xs text-ink-3 tabular-nums">
+            {streak} in a row
+            {longestStreak > streak && <span className="text-ink-4"> · best {longestStreak}</span>}
+          </span>
+        )}
         {todayReviews > 0 ? (
           <span className="text-xs text-ink-3">
             today: {todayReviews} reviewed
@@ -76,9 +85,6 @@ export function ActivityGraph({ activity }: { activity: Activity }) {
         ) : (
           <span className="text-xs text-ink-3">nothing today yet</span>
         )}
-        <span className="text-[0.6875rem] text-ink-4">
-          a day counts when nothing is left owed
-        </span>
       </div>
 
       {/* min-w-0 on every ancestor of the scroller, or the grid's intrinsic width wins and the
@@ -124,7 +130,6 @@ export function ActivityGraph({ activity }: { activity: Activity }) {
         <span>
           {activeDays}/30 days active{avg > 0 && ` · ~${avg} reviews when you sit down`}
         </span>
-        {longestStreak > streak && <span>best run {longestStreak}</span>}
         <span className="flex items-center gap-1.5">
           <span className="h-[10px] w-[10px] rounded-[2px] ring-1 ring-inset ring-mem-long/35" />
           nothing owed
