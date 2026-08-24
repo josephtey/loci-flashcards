@@ -55,5 +55,4 @@ export interface GraderStatus {
   available: boolean;
   reason: string | null;
   model: string;
-  host: string;
 }

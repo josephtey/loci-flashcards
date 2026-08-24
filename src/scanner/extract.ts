@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { newCardState } from '../lib/fsrs';
 import { readConfig, type Config } from '../lib/prompt-store';
-import { complete, ollamaReady, providerOf } from './llm';
+import { complete, providerReady, OLLAMA_MODEL } from '../lib/llm';
 import { supabase } from '../lib/supabase';
 import {
   zTargetBatch,
@@ -193,7 +193,6 @@ async function proposeTargets(
     // `high` rather than `xhigh`: on Sonnet 5 the extra effort went almost entirely into thinking
     // tokens without reaching an answer. This is still the deepest setting in the pipeline.
     effort: (await config()).effortStage1,
-    contextLimit: (await config()).ollamaContext,
     system: targeted ? await STAGE1_TARGETED_SYSTEM() : await STAGE1_SYSTEM(),
     user: targeted
       ? stage1TargetedUser({
@@ -235,7 +234,6 @@ async function writeCandidates(
     schema: zCandidateGroups,
     maxTokens: 48000,
     effort: (await config()).effortStage2,
-    contextLimit: (await config()).ollamaContext,
     system: await STAGE2_SYSTEM(),
     user: stage2BatchUser({
       title: note.title,
@@ -265,7 +263,6 @@ async function judge(
     schema: zBatchJudgement,
     maxTokens: 32000,
     effort: (await config()).effortStage3,
-    contextLimit: (await config()).ollamaContext,
     system: await JUDGE_SYSTEM(),
     user: judgeBatchUser({ folder, groups }),
   });
@@ -294,7 +291,6 @@ async function checkDuplicate(
     schema: zEquivalence,
     maxTokens: 4000,
     ...(cheap ? { think: false } : { effort: 'low' as const }),
-    contextLimit: (await config()).ollamaContext,
     system: await DEDUP_SYSTEM(),
     user: [
       '# Proposed card',
@@ -344,17 +340,15 @@ export async function extract(
   // Env wins over the config file, so a one-off run can override without editing anything —
   // including the provider, since the model name is what decides it.
   const settings = await config();
-  const local = settings.provider === 'ollama';
-  MODEL = process.env.LOCI_MODEL ?? (local ? settings.ollamaModel : settings.model);
-  MODEL_DEDUP = process.env.LOCI_MODEL_DEDUP ?? (local ? settings.ollamaModelDedup : settings.modelDedup);
+  const viaOllama = settings.provider === 'ollama';
+  MODEL = process.env.LOCI_MODEL ?? (viaOllama ? OLLAMA_MODEL : settings.model);
+  MODEL_DEDUP = process.env.LOCI_MODEL_DEDUP ?? (viaOllama ? OLLAMA_MODEL : settings.modelDedup);
 
   // Fail before touching the vault, not four notes in. A scan that dies partway has already
-  // spent minutes on the diff, and on a local provider the most likely reason is the dullest
-  // one — the model was never pulled.
+  // spent minutes on the diff.
   for (const m of new Set([MODEL, MODEL_DEDUP])) {
-    if (providerOf(m) !== 'ollama') continue;
-    const ready = await ollamaReady(m);
-    if (!ready.ok) throw new Error(`Extraction is set to Ollama but ${ready.reason}`);
+    const ready = await providerReady(m);
+    if (!ready.ok) throw new Error(`Extraction is set to ${settings.provider} but ${ready.reason}`);
   }
 
   const db = supabase();

@@ -17,7 +17,7 @@ dotenv({ path: '.env.local' });
 import * as z from 'zod';
 import { zTargetBatch } from '../lib/types';
 import { readConfig } from '../lib/prompt-store';
-import { complete } from './llm';
+import { complete, OLLAMA_MODEL } from '../lib/llm';
 import { STAGE1_SYSTEM, stage1User } from './prompts';
 
 const NOTE = process.env.NOTE;
@@ -27,10 +27,10 @@ if (!NOTE) {
 }
 
 const cfg = await readConfig();
-// Default to the pair the config would actually use, so the no-argument form answers the
-// question you have: "what would flipping the switch do to my deck?"
+// Default to both sides of the switch, so the no-argument form answers the question you have:
+// "what would flipping this do to my deck?"
 const MODELS = process.argv.slice(2);
-if (!MODELS.length) MODELS.push(cfg.ollamaModel, cfg.model);
+if (!MODELS.length) MODELS.push(OLLAMA_MODEL, cfg.model);
 
 const content = await readFile(NOTE, 'utf8');
 const title = NOTE.split('/').pop()!.replace(/\.md$/, '');
@@ -62,7 +62,6 @@ for (const model of MODELS) {
       schema: zTargetBatch,
       maxTokens: 32000,
       effort: 'high',
-      contextLimit: 32768,
       system,
       user,
     });

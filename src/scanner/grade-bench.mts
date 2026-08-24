@@ -16,15 +16,10 @@ import { readFile } from 'node:fs/promises';
  * one, change it — an argument about what a case *should* score is the useful part.
  */
 
-const HOST = (process.env.OLLAMA_HOST ?? 'http://127.0.0.1:11434').replace(/\/+$/, '');
-
-/** Mirrors `src/lib/grader.ts`: the key is for ollama.com, so it only goes to ollama.com. */
-const isLocal = /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])(:|\/|$)/.test(HOST);
+const HOST = 'https://ollama.com';
 const HEADERS: Record<string, string> = {
   'content-type': 'application/json',
-  ...(process.env.OLLAMA_API_KEY && !isLocal
-    ? { authorization: `Bearer ${process.env.OLLAMA_API_KEY}` }
-    : {}),
+  authorization: `Bearer ${process.env.OLLAMA_API_KEY ?? ''}`,
 };
 
 const FORMAT = {
@@ -248,10 +243,9 @@ async function grade(model: string, system: string, c: Case) {
       stream: false,
       // gpt-oss ignores `think: false` and spends the whole budget reasoning, returning empty
       // content; it wants a level. Everything else takes the boolean.
-      think: model.startsWith('gpt-oss') ? 'low' : false,
-      keep_alive: '30m',
+      think: 'low',
       format: FORMAT,
-      options: { temperature: 0, num_predict: model.startsWith('gpt-oss') ? 1200 : 220 },
+      options: { temperature: 0, num_predict: 1200 },
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: brief(c) },
@@ -301,7 +295,7 @@ function extractJson(raw: string): { rating: number; verdict: string; missing: s
 
 const system = (await readFile('prompts/grade-answer.md', 'utf8')) + CONTRACT;
 const models = process.argv.slice(2);
-if (!models.length) models.push('qwen3.5:4b');
+if (!models.length) models.push('gpt-oss:120b');
 
 for (const model of models) {
   console.log(`\n${'='.repeat(78)}\n  ${model}\n${'='.repeat(78)}`);

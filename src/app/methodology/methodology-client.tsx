@@ -9,7 +9,7 @@ import type { Config } from '@/lib/prompt-store';
 // *value* from it would pull `node:fs` into the client bundle. The type import above is erased
 // at compile time, so it costs nothing.
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
-const PROVIDERS = ['anthropic', 'ollama'] as const;
+const PROVIDERS = ['claude', 'ollama'] as const;
 
 interface Prompt {
   key: string;
@@ -58,7 +58,6 @@ const NUMERIC: (keyof Config)[] = [
   'duplicateGrey',
   'coverageContext',
   'emphasisWeight',
-  'ollamaContext',
 ];
 
 /**
@@ -303,10 +302,10 @@ export function MethodologyClient() {
         <h2 className="text-base font-light">Grading what you type</h2>
         <p className="mt-3 text-sm leading-relaxed text-ink-3">
           In <span className="text-ink-2">type it</span> mode a review asks you to write the
-          answer, and a small Qwen model running locally through Ollama scores it into the same
-          four grades. It costs nothing per card and never leaves the laptop. The grade is a
-          proposal — it is shown with its reasoning, and you accept or override it before anything
-          is written, which is what makes the disagreements worth keeping.
+          answer, and a model scores it into the same four grades — whichever provider is set
+          above. The grade is a proposal: it is shown with its reasoning, and you accept or
+          override it before anything is written, which is what makes the disagreements worth
+          keeping.
         </p>
         <p className="mt-3 text-sm leading-relaxed text-ink-3">
           This rubric is the whole grader. Edit it, then run{' '}
@@ -394,8 +393,8 @@ export function MethodologyClient() {
               <span className="text-xs leading-relaxed text-ink-3">{labels.graderAutoAccept}</span>
             </label>
 
-            {/* Which provider runs stages 1-4. The two model pairs are kept side by side rather
-                than overwritten, so flipping this back doesn't lose the names you tuned. */}
+            {/* The one switch. Everything that calls a model follows it — grading, all four
+                extraction stages, and Add cards. */}
             <label className="flex items-baseline gap-4">
               <select
                 value={config.provider}
@@ -412,16 +411,7 @@ export function MethodologyClient() {
               <span className="text-xs leading-relaxed text-ink-3">{labels.provider}</span>
             </label>
 
-            {(
-              [
-                'emphasisMarker',
-                'model',
-                'modelDedup',
-                'ollamaModel',
-                'ollamaModelDedup',
-                'graderModel',
-              ] as const
-            ).map((k) => (
+            {(['emphasisMarker', 'model', 'modelDedup'] as const).map((k) => (
               <label key={k} className="flex items-baseline gap-4">
                 <input
                   value={config[k]}

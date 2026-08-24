@@ -3,7 +3,7 @@ import { vaultStatus } from '@/lib/environment';
 import { readConfig } from '@/lib/prompt-store';
 import * as z from 'zod';
 import { zQuickBatch, type QuickCard } from '@/lib/types';
-import { complete } from '@/scanner/llm';
+import { complete, OLLAMA_MODEL } from '@/lib/llm';
 import { QUICK_ADD_SYSTEM } from '@/scanner/prompts';
 import { parseNote, vaultRoot } from '@/scanner/vault';
 import path from 'node:path';
@@ -86,7 +86,7 @@ export async function POST(req: Request) {
   // Follows the same `provider` switch as the nightly pipeline. A flag that moved stages 1-4 to
   // Ollama but quietly left this one on Anthropic would be the worst of both — you would think
   // the deck was being written locally while half of it still wasn't.
-  const model = cfg.provider === 'ollama' ? cfg.ollamaModel : cfg.model;
+  const model = cfg.provider === 'ollama' ? OLLAMA_MODEL : cfg.model;
 
   try {
     const { parsed, usage } = await complete<z.infer<typeof zQuickBatch>>({
@@ -95,7 +95,6 @@ export async function POST(req: Request) {
       schema: zQuickBatch,
       maxTokens: 32000,
       effort: cfg.effortQuickAdd,
-      contextLimit: cfg.ollamaContext,
       system: await QUICK_ADD_SYSTEM(),
       user,
     });

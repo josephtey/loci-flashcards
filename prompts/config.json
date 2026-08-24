@@ -16,10 +16,6 @@
   "effortStage2": "high",
   "effortStage3": "high",
   "effortQuickAdd": "medium",
-  "graderModel": "qwen3.5:4b",
   "graderAutoAccept": false,
-  "provider": "anthropic",
-  "ollamaModel": "qwen3.5:9b",
-  "ollamaModelDedup": "qwen3.5:4b",
-  "ollamaContext": 32768
+  "provider": "claude"
 }

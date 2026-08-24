@@ -121,35 +121,40 @@ disk per run, not baked into the build. So is the tuning in `prompts/config.json
 
 ### Who runs the models
 
-One switch, `provider` in `/methodology`, decides who does the extracting — **anthropic** or
-**ollama**. It covers stages 1–4 and the Add cards flow together; a flag that moved the pipeline
-but quietly left one surface on Anthropic would be the worst of both.
+One switch, `provider` in `/methodology`, and **everything follows it** — grading a typed answer,
+all four extraction stages, and Add cards. There are exactly two settings:
 
-The two model pairs are stored side by side (`model`/`modelDedup` and
-`ollamaModel`/`ollamaModelDedup`), so flipping back doesn't lose whichever names you had tuned.
-`LOCI_MODEL` / `LOCI_MODEL_DEDUP` override either, and the provider is derived from the model
-name, so a mixed run — Sonnet for the judgement stages, a local model for the dedup check — needs
-no extra configuration.
+| | what runs | needs |
+|---|---|---|
+| **`claude`** *(default)* | `claude-sonnet-5` for stages 1–3 and Add cards, `claude-haiku-4-5` for the duplicate check and grading | `ANTHROPIC_API_KEY` |
+| **`ollama`** | `gpt-oss:120b` for all of it, on Ollama's hosted service | `OLLAMA_API_KEY` |
 
-**Anthropic is the default, and on the evidence it should stay that way for a vault you care
-about.** Same note, same prompt, stage 1:
+Ollama means one model. Not a list, not a local install — `gpt-oss:120b` on ollama.com, which
+their free tier covers. It is the one measured to do the job: 18/18 on the grading benchmark,
+against 13/18 for `nemotron-3-nano:30b`, which scored a flatly wrong answer as correct.
+
+Running models on the laptop was the first version of this and it is gone. It was free and
+private, but every path in the codebase became conditional on which machine was running it — a
+local Ollama truncates long prompts silently, needs its context sized per call, has to be
+installed and pulled before anything works, and cannot be reached from a deployment at all. The
+hosted service has none of those properties, so none of that code exists any more.
+
+**`claude` is the default, and on the evidence it should stay that way for extraction.** Same
+note, same prompt, stage 1:
 
 | | targets | rationales | speed | cost |
 |---|---|---|---|---|
 | `claude-sonnet-5` | 14 | say *why forgetting it hurts* | 73s | ~$0.11 |
-| `qwen3.5:9b` | 9 | mostly restate what the passage *is* | 98s | free |
-| `qwen3.5:4b` | 12 | thinner still | 64s | free |
+| a mid-size open model | 9 | mostly restate what the passage *is* | 98s | free |
 
-Four of the top six targets were the same spans, so the local models are finding the material.
-What they lose is the judgement around it — Sonnet caught "attention sink" as a reusable
-interpretability term; neither Qwen did. Good enough for a first pass you intend to read; not
-good enough to point at the vault unattended.
-
-Decide for yourself rather than taking that table's word for it — it reads one note and writes
-nothing:
+Four of the top six were the same spans — the open model finds the material, it loses the
+judgement around it. Grading is the opposite case: it is one cheap comparison per card, forever,
+and `gpt-oss:120b` matches a human on it. Decide for yourself rather than taking the table's word
+— both benchmarks read real data and write nothing:
 
 ```sh
-NOTE="$VAULT_PATH/Ever Green Learnings/…/Some Note.md" npm run bench:extract
+npm run bench:grade                                    # rubric vs known-good gradings
+NOTE="$VAULT_PATH/…/Some Note.md" npm run bench:extract  # stage 1, both providers
 ```
 
 ### Two ways to answer
@@ -158,10 +163,9 @@ Every session has a toggle in its top-right corner.
 
 **self** is the original flow: reveal the answer, decide for yourself how well it came back.
 
-**type it** asks you to write the answer first, and a small Qwen model running locally through
-Ollama scores it into the same four grades. It exists because it is impossible to think *"I knew
-that"* at a blank screen and be wrong — self-grading measures confidence, and typing measures
-recall.
+**type it** asks you to write the answer first, and a model scores it into the same four grades.
+It exists because it is impossible to think *"I knew that"* at a blank screen and be wrong —
+self-grading measures confidence, and typing measures recall.
 
 The grade is a **proposal, not a verdict**. It appears alongside the real answer with the model's
 reasoning and whatever it thought you missed, with its pick outlined on the grade buttons.
@@ -174,8 +178,12 @@ Cards with no reference answer — the open, catechism-style ones — always fal
 A grader with nothing to compare against is guessing, and its guesses would land in the very log
 being used to judge it. `s` hands any other card back to you too.
 
-The model runs **on your machine**: no per-card cost, no network, and nothing you type leaves the
-laptop. See [Recall mode](#4-recall-mode) for setup.
+Which model grades follows `provider` like everything else — `gpt-oss:120b` on Ollama's free
+tier, or `claude-haiku-4-5`. The rubric it applies is `prompts/grade-answer.md`, editable from
+`/methodology`; it is prose, and prose has no tests, so measure an edit with `npm run bench:grade`
+rather than trusting it. The first draft of that rubric scored 15/17 *and gave every correct
+answer an Easy*, which would have quietly stretched every interval in the deck. Nothing surfaced
+that except running the benchmark.
 
 ---
 
@@ -220,82 +228,21 @@ with `--request "<what to extract>"` for a targeted run, `--force` to re-extract
 snapshot (what you want after editing the prompts, when the vault hasn't changed but the output
 would), and `--cron`.
 
-### 4. Recall mode
+### 4. Ollama (optional)
 
-Optional — the deck works without it, and the **type it** toggle simply stays greyed out with a
-reason. To turn it on:
-
-```sh
-brew install --cask ollama-app    # the app bundle, NOT `brew install ollama`
-open -a Ollama                    # click through the first-run screen once
-ollama pull qwen3.5:4b            # 3.4GB
-```
-
-Use the **cask**, not the formula. The Homebrew formula ships a 60MB CPU-only binary — it works,
-and it is roughly ten times slower, because it never touches Metal. `ollama ps` tells you which
-one you have: it should say `100% GPU`, not `100% CPU`.
-
-`qwen3.5:4b` is the default because it was measured, not guessed:
-
-| model | agrees with a human | median |
-|---|---|---|
-| **qwen3.5:4b** | **17/18** | ~2.9s |
-| qwen3.5:2b | 11/17 | ~1.3s |
-
-2b is twice as fast and not safe — it scored a flatly wrong answer as *Good*, which is the one
-failure mode that matters, since it schedules a misconception as if you knew it. Change the model
-in `/methodology` (`graderModel`) if you want to try `qwen3.5:9b` on a bigger machine.
-
-The rubric that does the grading is `prompts/grade-answer.md`, editable from `/methodology` like
-every other prompt. It is prose, and prose has no tests, so measure what an edit did:
-
-```sh
-npm run bench:grade              # the default model
-npm run bench:grade qwen3.5:9b   # or any other
-```
-
-The first draft of that rubric scored 15/17 *and gave every correct answer an Easy* — which would
-have quietly stretched every interval in the deck. Nothing surfaced it except running this.
-
-#### Hosted (Vercel)
-
-There is no laptop inside a Vercel function, so `127.0.0.1:11434` is nothing and the toggle greys
-out. Point it at Ollama's hosted service instead — three env vars, no other change:
+Only needed if you set `provider` to `ollama`. Get a key at
+[ollama.com/settings/keys](https://ollama.com/settings/keys) and put it in `.env.local`:
 
 ```
-OLLAMA_HOST=https://ollama.com
-OLLAMA_API_KEY=<from https://ollama.com/settings/keys>
-OLLAMA_MODEL=gpt-oss:120b
+OLLAMA_API_KEY=…
 ```
 
-`OLLAMA_MODEL` is needed because `prompts/config.json` is committed and read-only when hosted, so
-`graderModel` can't be changed there — and the local default doesn't exist on the cloud.
-
-**This works on the free tier**, which was worth measuring rather than assuming:
-
-| model | tier | agrees | median |
-|---|---|---|---|
-| **gpt-oss:120b** | **free** | **18/18** | **~0.7s** |
-| qwen3.5:4b (local) | — | 17/18 | ~2.9s |
-| nemotron-3-nano:30b | free | 13/18 | ~0.8s |
-| qwen3.5:397b | Pro, $20/mo | untested — needs a subscription | |
-
-Two gotchas the code already handles, both found by measuring:
-
-- **ollama.com does not compile the `format` grammar.** A schema-constrained request comes back as
-  prose (`**Score: 1** – the response does not…`), so `src/lib/grader.ts` states the JSON contract
-  in words as well and parses tolerantly. Local Ollama enforces the schema; the cloud does not.
-- **Free-tier calls can cold-start.** A typical grade is under a second, but one measured call took
-  42 — so the request timeout is 25s local, 75s hosted.
+That is the whole setup. Nothing to install, nothing to pull, and the same key works locally and
+on a deployment — which is the point of having dropped the local path.
 
 Free-tier usage resets on rolling 5-hour and 7-day windows, so a very heavy session could hit a
-limit; a grade that fails for any reason falls back to self-grading that one card rather than
-losing it. `gpt-oss:120b` is not Qwen — Qwen on the cloud needs the $20/mo Pro tier. If you
-subscribe, one command tells you whether it is worth it:
-
-```sh
-OLLAMA_HOST=https://ollama.com npm run bench:grade qwen3.5:397b
-```
+limit. A grade that fails for any reason falls back to self-grading that one card rather than
+losing it; an extraction stage that fails aborts the run and says why.
 
 ### 5. Hosting
 
@@ -304,8 +251,8 @@ The web app deploys anywhere. The two features that read the vault — **Sync wi
 says why rather than failing. Reviewing, browsing, editing and writing cards by hand all work
 fine hosted, since they only need Postgres.
 
-Recall mode works hosted too, but only if you point it somewhere — see
-[Hosted (Vercel)](#hosted-vercel). Left alone it greys out like the vault features do.
+Recall mode works hosted with no extra configuration, whichever provider you are on — both are
+just an API key, which is exactly why the local option is gone.
 
 Prompts are also read-only when hosted: the filesystem is, so `/methodology` shows them but can't
 save. Edit them in the repo, or locally.
@@ -358,9 +305,9 @@ docs/prompt-principles.md   design spec; §2–4 injected verbatim into the extr
 prompts/                    every extraction prompt, editable at runtime
 supabase/migrations/        schema
 src/scanner/                local CLI — vault, blocks, sync, prompts, extract, doctor, reset
-src/scanner/llm.ts          one model call, either provider (Anthropic or Ollama)
+src/lib/llm.ts              every model call in the project, either provider
 src/scanner/*-bench.mts     grade-bench (rubric vs known-good gradings), extract-bench
-                            (stage 1 on one note, provider vs provider, writes nothing)
+                            (stage 1 on one note, provider vs provider); neither writes anything
 src/lib/                    types, supabase client, FSRS wrapper, queries, goals, grader
 src/app/api/                scan control, review grading, card CRUD, sync preview/result/log
 src/components/             review session, sync modal, activity graph, day detail

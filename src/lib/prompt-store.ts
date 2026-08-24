@@ -67,15 +67,17 @@ export const PROMPT_FILES = {
 export type PromptKey = keyof typeof PROMPT_FILES;
 
 /**
- * Who runs the extraction pipeline.
+ * Who runs every model call in the project.
  *
- * `anthropic` is the default and the only one that has been shown to write good cards. `ollama`
- * runs the same four stages against a local model for nothing — worth having, because the nightly
- * scan is where essentially all the token spend in this project lives, but the judgement stages
- * are the hardest thing here and a small local model is measurably worse at them. Switch it,
- * scan one note with `--paths`, and read what comes out before trusting it with the vault.
+ * One switch, no exceptions: grading typed answers, all four extraction stages, and the Add cards
+ * flow all follow it. `claude` is Anthropic's API; `ollama` is Ollama's hosted service, which
+ * means `gpt-oss:120b` and nothing else.
+ *
+ * `claude` is the default and the only one shown to write good cards — see the comparison in the
+ * README. Switch it, scan one note with `--paths`, and read what comes out before trusting it
+ * with the vault.
  */
-export const PROVIDERS = ['anthropic', 'ollama'] as const;
+export const PROVIDERS = ['claude', 'ollama'] as const;
 export type ProviderName = (typeof PROVIDERS)[number];
 
 /** The SDK's effort levels. Kept narrow so a typo in the config file can't reach the API. */
@@ -100,12 +102,8 @@ export interface Config {
   effortStage2: Effort;
   effortStage3: Effort;
   effortQuickAdd: Effort;
-  graderModel: string;
   graderAutoAccept: boolean;
   provider: ProviderName;
-  ollamaModel: string;
-  ollamaModelDedup: string;
-  ollamaContext: number;
 }
 
 export const CONFIG_LABELS: Record<keyof Config, string> = {
@@ -122,29 +120,20 @@ export const CONFIG_LABELS: Record<keyof Config, string> = {
     'Write this beside a passage in a note to flag it as worth remembering. Pick something that never occurs by accident in your own writing.',
   emphasisWeight:
     'How much more coverage flagged material earns. 3 means it counts triple towards the target budget.',
-  model: 'Model for stages 1-3.',
-  modelDedup: 'Model for the duplicate check. A cheap one is fine.',
+  model: 'Anthropic model for stages 1-3 and Add cards. Ignored when provider is ollama.',
+  modelDedup:
+    'Anthropic model for the two cheap calls — the duplicate check and grading a typed answer. ' +
+    'Ignored when provider is ollama.',
   effortStage1: 'Reasoning effort when choosing targets.',
   effortStage2: 'Reasoning effort when writing cards.',
   effortStage3: 'Reasoning effort when judging.',
   effortQuickAdd: 'Reasoning effort for the one-pass Add cards flow. Lower is faster.',
-  graderModel:
-    'Ollama model that grades typed answers. Local and free — a 4B Qwen is plenty for comparing ' +
-    'an answer against a reference. Drop to qwen3.5:2b if it feels slow, raise to :9b if it ' +
-    'misjudges.',
   graderAutoAccept:
     'Commit the grade the moment the model returns it, instead of waiting for you to accept. ' +
     'Leave this off until the verdicts have earned it.',
   provider:
-    'Who runs stages 1-4. Ollama is free and local; Anthropic writes better cards. Scan one ' +
-    'note and read the output before switching the vault over.',
-  ollamaModel: 'Model for stages 1-3 when provider is ollama. Bigger matters far more here than for grading.',
-  ollamaModelDedup:
-    'Model for the duplicate check when provider is ollama. A small one is genuinely fine — it ' +
-    'is one binary comparison.',
-  ollamaContext:
-    'Largest context Ollama may allocate, in tokens. A prompt that needs more aborts the stage ' +
-    'rather than being silently truncated from the front, which is what Ollama does by default.',
+    'Who runs every model call — grading, all four extraction stages, and Add cards. ' +
+    'ollama means gpt-oss:120b on Ollama\u2019s hosted service and needs OLLAMA_API_KEY.',
 };
 
 const CONFIG_FILE = 'config.json';
@@ -167,12 +156,8 @@ export const DEFAULT_CONFIG: Config = {
   effortStage2: 'high',
   effortStage3: 'high',
   effortQuickAdd: 'medium',
-  graderModel: 'qwen3.5:4b',
   graderAutoAccept: false,
-  provider: 'anthropic',
-  ollamaModel: 'qwen3.5:9b',
-  ollamaModelDedup: 'qwen3.5:4b',
-  ollamaContext: 32768,
+  provider: 'claude',
 };
 
 /** Where the editable prompts live, relative to the app root. */
@@ -234,7 +219,11 @@ export async function readConfig(): Promise<Config> {
   try {
     const raw = await readFile(resolve(CONFIG_FILE), 'utf8');
     // Merge over defaults so a config written before a knob existed still loads.
-    return { ...DEFAULT_CONFIG, ...(JSON.parse(raw) as Partial<Config>) };
+    const merged = { ...DEFAULT_CONFIG, ...(JSON.parse(raw) as Partial<Config>) };
+    // The provider was briefly called `anthropic`. Read the old name rather than reject a file
+    // written last week.
+    if ((merged.provider as string) === 'anthropic') merged.provider = 'claude';
+    return merged;
   } catch {
     return DEFAULT_CONFIG;
   }
@@ -260,15 +249,6 @@ export async function writeConfig(next: Partial<Config>): Promise<Config> {
   }
   if (!PROVIDERS.includes(merged.provider)) {
     throw new Error(`provider must be one of: ${PROVIDERS.join(', ')}`);
-  }
-  // Below about 8k there is no room for the principles document, so every stage-1 call would
-  // abort. Better to reject the setting than to hand back a pipeline that cannot run.
-  if (!(merged.ollamaContext >= 8192)) {
-    throw new Error('ollamaContext must be at least 8192 — the principles doc alone is ~8k tokens.');
-  }
-  // An empty model name would fail at grade time, one card into a session, as a network error.
-  if (!merged.graderModel.trim()) {
-    throw new Error('graderModel cannot be empty — it is the Ollama model that grades answers.');
   }
   if (merged.cardsPerTarget > merged.candidatesPerTarget) {
     throw new Error('cardsPerTarget cannot exceed candidatesPerTarget — there would be nothing to pick from.');
