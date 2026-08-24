@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "doctor": "tsx src/scanner/doctor.ts",
     "reset": "tsx src/scanner/reset.ts",
-    "bench:grade": "tsx src/scanner/grade-bench.mts"
+    "bench:grade": "tsx src/scanner/grade-bench.mts",
+    "bench:extract": "tsx src/scanner/extract-bench.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.117.1",

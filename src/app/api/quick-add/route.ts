@@ -1,9 +1,9 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { NextResponse } from 'next/server';
 import { vaultStatus } from '@/lib/environment';
 import { readConfig } from '@/lib/prompt-store';
+import * as z from 'zod';
 import { zQuickBatch, type QuickCard } from '@/lib/types';
+import { complete } from '@/scanner/llm';
 import { QUICK_ADD_SYSTEM } from '@/scanner/prompts';
 import { parseNote, vaultRoot } from '@/scanner/vault';
 import path from 'node:path';
@@ -83,38 +83,34 @@ export async function POST(req: Request) {
     ]),
   ].join('\n');
 
+  // Follows the same `provider` switch as the nightly pipeline. A flag that moved stages 1-4 to
+  // Ollama but quietly left this one on Anthropic would be the worst of both — you would think
+  // the deck was being written locally while half of it still wasn't.
+  const model = cfg.provider === 'ollama' ? cfg.ollamaModel : cfg.model;
+
   try {
-    const stream = new Anthropic().messages.stream({
-      model: cfg.model,
-      max_tokens: 32000,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: cfg.effortQuickAdd, format: zodOutputFormat(zQuickBatch) },
-      system: [
-        { type: 'text', text: await QUICK_ADD_SYSTEM(), cache_control: { type: 'ephemeral' } },
-      ],
-      messages: [{ role: 'user', content: user }],
+    const { parsed, usage } = await complete<z.infer<typeof zQuickBatch>>({
+      stage: 'quick add',
+      model,
+      schema: zQuickBatch,
+      maxTokens: 32000,
+      effort: cfg.effortQuickAdd,
+      contextLimit: cfg.ollamaContext,
+      system: await QUICK_ADD_SYSTEM(),
+      user,
     });
 
-    const message = await stream.finalMessage();
-
-    if (message.stop_reason === 'max_tokens') {
-      return NextResponse.json(
-        { error: 'Ran out of room before finishing — try fewer notes or a narrower request.' },
-        { status: 500 },
-      );
-    }
-
-    const parsed = message.parsed_output;
     return NextResponse.json({
       cards: (parsed?.cards ?? []) as QuickCard[],
       skipped_reason: parsed?.skipped_reason ?? null,
       notes: notes.map((n) => ({ path: n.path, title: n.title })),
+      model,
       usage: {
         input:
-          message.usage.input_tokens +
-          (message.usage.cache_creation_input_tokens ?? 0) +
-          (message.usage.cache_read_input_tokens ?? 0),
-        output: message.usage.output_tokens,
+          usage.input_tokens +
+          (usage.cache_creation_input_tokens ?? 0) +
+          (usage.cache_read_input_tokens ?? 0),
+        output: usage.output_tokens,
       },
     });
   } catch (err) {

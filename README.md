@@ -119,6 +119,39 @@ the home indicator. Add it to the home screen and it opens without browser chrom
 **Every prompt is editable at runtime** from `/methodology` — the files in `prompts/` are read from
 disk per run, not baked into the build. So is the tuning in `prompts/config.json`.
 
+### Who runs the models
+
+One switch, `provider` in `/methodology`, decides who does the extracting — **anthropic** or
+**ollama**. It covers stages 1–4 and the Add cards flow together; a flag that moved the pipeline
+but quietly left one surface on Anthropic would be the worst of both.
+
+The two model pairs are stored side by side (`model`/`modelDedup` and
+`ollamaModel`/`ollamaModelDedup`), so flipping back doesn't lose whichever names you had tuned.
+`LOCI_MODEL` / `LOCI_MODEL_DEDUP` override either, and the provider is derived from the model
+name, so a mixed run — Sonnet for the judgement stages, a local model for the dedup check — needs
+no extra configuration.
+
+**Anthropic is the default, and on the evidence it should stay that way for a vault you care
+about.** Same note, same prompt, stage 1:
+
+| | targets | rationales | speed | cost |
+|---|---|---|---|---|
+| `claude-sonnet-5` | 14 | say *why forgetting it hurts* | 73s | ~$0.11 |
+| `qwen3.5:9b` | 9 | mostly restate what the passage *is* | 98s | free |
+| `qwen3.5:4b` | 12 | thinner still | 64s | free |
+
+Four of the top six targets were the same spans, so the local models are finding the material.
+What they lose is the judgement around it — Sonnet caught "attention sink" as a reusable
+interpretability term; neither Qwen did. Good enough for a first pass you intend to read; not
+good enough to point at the vault unattended.
+
+Decide for yourself rather than taking that table's word for it — it reads one note and writes
+nothing:
+
+```sh
+NOTE="$VAULT_PATH/Ever Green Learnings/…/Some Note.md" npm run bench:extract
+```
+
 ### Two ways to answer
 
 Every session has a toggle in its top-right corner.
@@ -324,8 +357,10 @@ time, which is why stage 3 exists.
 docs/prompt-principles.md   design spec; §2–4 injected verbatim into the extractor
 prompts/                    every extraction prompt, editable at runtime
 supabase/migrations/        schema
-src/scanner/                local CLI — vault, blocks, sync, prompts, extract, doctor, reset,
-                            grade-bench (measures a rubric edit against known-good gradings)
+src/scanner/                local CLI — vault, blocks, sync, prompts, extract, doctor, reset
+src/scanner/llm.ts          one model call, either provider (Anthropic or Ollama)
+src/scanner/*-bench.mts     grade-bench (rubric vs known-good gradings), extract-bench
+                            (stage 1 on one note, provider vs provider, writes nothing)
 src/lib/                    types, supabase client, FSRS wrapper, queries, goals, grader
 src/app/api/                scan control, review grading, card CRUD, sync preview/result/log
 src/components/             review session, sync modal, activity graph, day detail

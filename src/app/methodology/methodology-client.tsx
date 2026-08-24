@@ -9,6 +9,7 @@ import type { Config } from '@/lib/prompt-store';
 // *value* from it would pull `node:fs` into the client bundle. The type import above is erased
 // at compile time, so it costs nothing.
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
+const PROVIDERS = ['anthropic', 'ollama'] as const;
 
 interface Prompt {
   key: string;
@@ -57,6 +58,7 @@ const NUMERIC: (keyof Config)[] = [
   'duplicateGrey',
   'coverageContext',
   'emphasisWeight',
+  'ollamaContext',
 ];
 
 /**
@@ -392,7 +394,34 @@ export function MethodologyClient() {
               <span className="text-xs leading-relaxed text-ink-3">{labels.graderAutoAccept}</span>
             </label>
 
-            {(['emphasisMarker', 'model', 'modelDedup', 'graderModel'] as const).map((k) => (
+            {/* Which provider runs stages 1-4. The two model pairs are kept side by side rather
+                than overwritten, so flipping this back doesn't lose the names you tuned. */}
+            <label className="flex items-baseline gap-4">
+              <select
+                value={config.provider}
+                onChange={(e) => void saveConfig({ provider: e.target.value as Config['provider'] })}
+                className="w-20 shrink-0 rounded border border-ink-4 bg-surface px-2 py-1 font-mono text-xs text-ink"
+              >
+                {PROVIDERS.map((v) => (
+                  <option key={v} value={v} className="bg-surface">
+                    {v}
+                  </option>
+                ))}
+              </select>
+              <span className="w-44 shrink-0 font-mono text-[0.6875rem] text-ink-2">provider</span>
+              <span className="text-xs leading-relaxed text-ink-3">{labels.provider}</span>
+            </label>
+
+            {(
+              [
+                'emphasisMarker',
+                'model',
+                'modelDedup',
+                'ollamaModel',
+                'ollamaModelDedup',
+                'graderModel',
+              ] as const
+            ).map((k) => (
               <label key={k} className="flex items-baseline gap-4">
                 <input
                   value={config[k]}

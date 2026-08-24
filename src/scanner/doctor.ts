@@ -2,6 +2,8 @@
 import 'dotenv/config';
 import { config } from 'dotenv';
 import Anthropic from '@anthropic-ai/sdk';
+import { readConfig } from '../lib/prompt-store';
+import { ollamaReady, providerOf } from './llm';
 import { scanVault, vaultFolders, vaultRoot } from './vault';
 
 config({ path: '.env.local', override: true });
@@ -45,9 +47,13 @@ async function checkEnv() {
 
   url ? ok('SUPABASE_URL', url) : bad('SUPABASE_URL', 'missing');
   key ? ok('SUPABASE_SECRET_KEY', `${key.slice(0, 12)}…`) : bad('SUPABASE_SECRET_KEY', 'missing');
-  process.env.ANTHROPIC_API_KEY
-    ? ok('ANTHROPIC_API_KEY', 'set')
-    : bad('ANTHROPIC_API_KEY', 'missing — extraction will fail');
+  // Only fatal when Anthropic is the one doing the extracting. A vault running entirely on a
+  // local Ollama has no use for the key, and reporting it as a problem would be noise.
+  const usesAnthropic = (await readConfig()).provider === 'anthropic';
+  if (process.env.ANTHROPIC_API_KEY) ok('ANTHROPIC_API_KEY', 'set');
+  else if (usesAnthropic) bad('ANTHROPIC_API_KEY', 'missing — extraction will fail');
+  else warn('ANTHROPIC_API_KEY', 'missing, but provider is ollama so nothing needs it');
+
   process.env.VAULT_PATH ? ok('VAULT_PATH') : bad('VAULT_PATH', 'missing');
 
   return { url, key };
@@ -119,23 +125,44 @@ async function checkSchema(url?: string, key?: string) {
 
 async function checkModel() {
   console.log(`\n${BOLD}model${RESET}`);
-  if (!process.env.ANTHROPIC_API_KEY) {
-    bad('skipped', 'no ANTHROPIC_API_KEY');
-    return;
-  }
-  try {
-    // Cheapest possible round trip that still proves auth and model access.
-    const res = await new Anthropic().messages.create({
-      model: process.env.LOCI_MODEL ?? 'claude-sonnet-5',
-      max_tokens: 8,
-      thinking: { type: 'disabled' },
-      output_config: { effort: 'low' },
-      messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
-    });
-    const text = res.content.find((b) => b.type === 'text');
-    ok(`${process.env.LOCI_MODEL ?? 'claude-sonnet-5'} reachable`, text && text.type === 'text' ? text.text.trim() : '');
-  } catch (err) {
-    bad('model call failed', err instanceof Error ? err.message : String(err));
+
+  const cfg = await readConfig();
+  const local = cfg.provider === 'ollama';
+  const model = process.env.LOCI_MODEL ?? (local ? cfg.ollamaModel : cfg.model);
+  const dedup = process.env.LOCI_MODEL_DEDUP ?? (local ? cfg.ollamaModelDedup : cfg.modelDedup);
+  console.log(`  ${DIM}provider: ${cfg.provider}${RESET}`);
+
+  // Both stages are checked, because a mixed run is legal — `LOCI_MODEL_DEDUP` can point at a
+  // local model while stages 1-3 stay on Anthropic, and a missing pull on either one kills a
+  // scan just as dead.
+  for (const m of new Set([model, dedup])) {
+    if (providerOf(m) === 'ollama') {
+      const ready = await ollamaReady(m);
+      ready.ok ? ok(`${m} reachable`) : bad(m, ready.reason);
+      continue;
+    }
+    if (!process.env.ANTHROPIC_API_KEY) {
+      bad(m, 'no ANTHROPIC_API_KEY');
+      continue;
+    }
+    // Haiku 4.5 predates adaptive thinking and rejects `effort` outright — the same carve-out
+    // the dedup call makes. A preflight that fails on a model the pipeline uses happily would
+    // send you looking for a problem that isn't there.
+    const cheap = m.startsWith('claude-haiku');
+    try {
+      // Cheapest possible round trip that still proves auth and model access.
+      const res = await new Anthropic().messages.create({
+        model: m,
+        max_tokens: 8,
+        ...(cheap ? {} : { thinking: { type: 'disabled' as const } }),
+        ...(cheap ? {} : { output_config: { effort: 'low' as const } }),
+        messages: [{ role: 'user', content: 'Reply with the single word: ok' }],
+      });
+      const text = res.content.find((b) => b.type === 'text');
+      ok(`${m} reachable`, text && text.type === 'text' ? text.text.trim() : '');
+    } catch (err) {
+      bad(`${m} call failed`, err instanceof Error ? err.message : String(err));
+    }
   }
 }
 

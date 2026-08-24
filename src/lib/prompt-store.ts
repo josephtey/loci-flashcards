@@ -66,6 +66,18 @@ export const PROMPT_FILES = {
 
 export type PromptKey = keyof typeof PROMPT_FILES;
 
+/**
+ * Who runs the extraction pipeline.
+ *
+ * `anthropic` is the default and the only one that has been shown to write good cards. `ollama`
+ * runs the same four stages against a local model for nothing — worth having, because the nightly
+ * scan is where essentially all the token spend in this project lives, but the judgement stages
+ * are the hardest thing here and a small local model is measurably worse at them. Switch it,
+ * scan one note with `--paths`, and read what comes out before trusting it with the vault.
+ */
+export const PROVIDERS = ['anthropic', 'ollama'] as const;
+export type ProviderName = (typeof PROVIDERS)[number];
+
 /** The SDK's effort levels. Kept narrow so a typo in the config file can't reach the API. */
 export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = (typeof EFFORTS)[number];
@@ -90,6 +102,10 @@ export interface Config {
   effortQuickAdd: Effort;
   graderModel: string;
   graderAutoAccept: boolean;
+  provider: ProviderName;
+  ollamaModel: string;
+  ollamaModelDedup: string;
+  ollamaContext: number;
 }
 
 export const CONFIG_LABELS: Record<keyof Config, string> = {
@@ -119,6 +135,16 @@ export const CONFIG_LABELS: Record<keyof Config, string> = {
   graderAutoAccept:
     'Commit the grade the moment the model returns it, instead of waiting for you to accept. ' +
     'Leave this off until the verdicts have earned it.',
+  provider:
+    'Who runs stages 1-4. Ollama is free and local; Anthropic writes better cards. Scan one ' +
+    'note and read the output before switching the vault over.',
+  ollamaModel: 'Model for stages 1-3 when provider is ollama. Bigger matters far more here than for grading.',
+  ollamaModelDedup:
+    'Model for the duplicate check when provider is ollama. A small one is genuinely fine — it ' +
+    'is one binary comparison.',
+  ollamaContext:
+    'Largest context Ollama may allocate, in tokens. A prompt that needs more aborts the stage ' +
+    'rather than being silently truncated from the front, which is what Ollama does by default.',
 };
 
 const CONFIG_FILE = 'config.json';
@@ -143,6 +169,10 @@ export const DEFAULT_CONFIG: Config = {
   effortQuickAdd: 'medium',
   graderModel: 'qwen3.5:4b',
   graderAutoAccept: false,
+  provider: 'anthropic',
+  ollamaModel: 'qwen3.5:9b',
+  ollamaModelDedup: 'qwen3.5:4b',
+  ollamaContext: 32768,
 };
 
 /** Where the editable prompts live, relative to the app root. */
@@ -227,6 +257,14 @@ export async function writeConfig(next: Partial<Config>): Promise<Config> {
   }
   if (!(merged.emphasisWeight >= 1)) {
     throw new Error('emphasisWeight must be at least 1 — below that, flagging would demote.');
+  }
+  if (!PROVIDERS.includes(merged.provider)) {
+    throw new Error(`provider must be one of: ${PROVIDERS.join(', ')}`);
+  }
+  // Below about 8k there is no room for the principles document, so every stage-1 call would
+  // abort. Better to reject the setting than to hand back a pipeline that cannot run.
+  if (!(merged.ollamaContext >= 8192)) {
+    throw new Error('ollamaContext must be at least 8192 — the principles doc alone is ~8k tokens.');
   }
   // An empty model name would fail at grade time, one card into a session, as a network error.
   if (!merged.graderModel.trim()) {

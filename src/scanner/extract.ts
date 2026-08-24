@@ -1,8 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import * as z from 'zod';
 import { newCardState } from '../lib/fsrs';
 import { readConfig, type Config } from '../lib/prompt-store';
+import { complete, ollamaReady, providerOf } from './llm';
 import { supabase } from '../lib/supabase';
 import {
   zTargetBatch,
@@ -35,12 +34,24 @@ import type { NoteChange, SyncResult } from './sync';
  * near-Opus quality on this kind of work at a fraction of the price — with Haiku on the dedup
  * check, which is a binary comparison run at `effort: low`.
  *
- * Override per stage with LOCI_MODEL / LOCI_MODEL_DEDUP if a run wants more or less.
+ * `provider: 'ollama'` in the config swaps both for the local pair instead. The two are kept as
+ * separate config fields rather than one, so flipping the switch back doesn't lose whichever
+ * model names you had tuned on the other side.
+ *
+ * Override per stage with LOCI_MODEL / LOCI_MODEL_DEDUP if a run wants more or less; an env
+ * override wins over the provider flag, which is what makes a one-off comparison run easy.
  */
 let MODEL = process.env.LOCI_MODEL ?? 'claude-sonnet-5';
 let MODEL_DEDUP = process.env.LOCI_MODEL_DEDUP ?? 'claude-haiku-4-5';
 
-/** List price per million tokens, [input, output]. */
+/**
+ * List price per million tokens, [input, output].
+ *
+ * A model that isn't here is priced at zero, which is exactly right for a local one: the run
+ * costs electricity, and reporting a fabricated dollar figure for it would be worse than
+ * reporting nothing. A cloud Ollama model is also zero here — it bills against a subscription,
+ * not per token, so there is no per-token rate to quote.
+ */
 const PRICING: Record<string, [number, number]> = {
   'claude-opus-5': [5, 25],
   'claude-sonnet-5': [3, 15], // introductory $2/$10 through 2026-08-31; quoting standard
@@ -63,53 +74,6 @@ async function config(): Promise<Config> {
   // the methodology page and the next scan picks it up.
   if (!cfg) cfg = await readConfig();
   return cfg;
-}
-
-let cachedClient: Anthropic | null = null;
-function anthropic(): Anthropic {
-  if (!cachedClient) cachedClient = new Anthropic();
-  return cachedClient;
-}
-
-/**
- * Every model call streams.
- *
- * The SDK refuses a non-streaming request whose `max_tokens` implies it could run past ten
- * minutes, and a batched stage-2 call over five targets — adaptive thinking plus fifteen
- * candidates with justifications — is comfortably in that range. `finalMessage()` still carries
- * `parsed_output`, so structured outputs work exactly as before; only the transport changes.
- */
-async function call<T>(
-  stage: string,
-  params: Parameters<Anthropic['messages']['stream']>[0],
-): Promise<{
-  parsed: T | null;
-  usage: {
-    input_tokens: number;
-    output_tokens: number;
-    cache_creation_input_tokens?: number | null;
-    cache_read_input_tokens?: number | null;
-  };
-}> {
-  const stream = anthropic().messages.stream(params);
-  const message = await stream.finalMessage();
-
-  // Truncation must never look like an empty answer. `max_tokens` covers thinking as well as
-  // the response, so a model that thinks hard can exhaust the budget mid-JSON and come back with
-  // nothing parseable — which, silently swallowed, reads as "this note had nothing worth
-  // carding" while having cost a full call.
-  if (message.stop_reason === 'max_tokens') {
-    throw new Error(
-      `${stage}: hit max_tokens (${params.max_tokens}) before finishing — ` +
-        `${message.usage.output_tokens} output tokens spent, mostly on thinking. ` +
-        `Raise max_tokens or lower output_config.effort.`,
-    );
-  }
-  if (message.stop_reason === 'refusal') {
-    throw new Error(`${stage}: refused (${message.stop_details?.category ?? 'unknown'})`);
-  }
-
-  return { parsed: (message.parsed_output ?? null) as T | null, usage: message.usage };
 }
 
 export interface Usage {
@@ -219,50 +183,41 @@ async function proposeTargets(
   // one specific request and treats anything else it finds as out of scope.
   const targeted = Boolean(ctx.request?.trim());
 
-  const { parsed, usage: u } = await call<z.infer<typeof zTargetBatch>>('stage 1 (targets)', {
+  const { parsed, usage: u } = await complete<z.infer<typeof zTargetBatch>>({
+    stage: 'stage 1 (targets)',
     model: MODEL,
+    schema: zTargetBatch,
     // Generous, because `max_tokens` bounds thinking + response together and a sweep over a
     // 3,000-word note legitimately produces a long structured answer.
-    max_tokens: 32000,
-    thinking: { type: 'adaptive' },
+    maxTokens: 32000,
     // `high` rather than `xhigh`: on Sonnet 5 the extra effort went almost entirely into thinking
     // tokens without reaching an answer. This is still the deepest setting in the pipeline.
-    output_config: { effort: (await config()).effortStage1, format: zodOutputFormat(zTargetBatch) },
-    system: [
-      {
-        type: 'text',
-        text: targeted ? await STAGE1_TARGETED_SYSTEM() : await STAGE1_SYSTEM(),
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [
-      {
-        role: 'user',
-        content: targeted
-          ? stage1TargetedUser({
-              title: change.note.title,
-              folder: change.note.folder,
-              subfolder: change.note.subfolder,
-              content: change.note.content,
-              request: ctx.request!,
-              linked: ctx.linked,
-              existingFronts: ctx.existingFronts,
-            })
-          : stage1User({
-              title: change.note.title,
-              folder: change.note.folder,
-              subfolder: change.note.subfolder,
-              content: change.note.content,
-              changedText: renderDiff(change.diff),
-              isNew: change.kind === 'new',
-              linked: ctx.linked,
-              existingFronts: ctx.existingFronts,
-              rejections: ctx.rejections,
-              emphasis: ctx.emphasis,
-              budget,
-            }),
-      },
-    ],
+    effort: (await config()).effortStage1,
+    contextLimit: (await config()).ollamaContext,
+    system: targeted ? await STAGE1_TARGETED_SYSTEM() : await STAGE1_SYSTEM(),
+    user: targeted
+      ? stage1TargetedUser({
+          title: change.note.title,
+          folder: change.note.folder,
+          subfolder: change.note.subfolder,
+          content: change.note.content,
+          request: ctx.request!,
+          linked: ctx.linked,
+          existingFronts: ctx.existingFronts,
+        })
+      : stage1User({
+          title: change.note.title,
+          folder: change.note.folder,
+          subfolder: change.note.subfolder,
+          content: change.note.content,
+          changedText: renderDiff(change.diff),
+          isNew: change.kind === 'new',
+          linked: ctx.linked,
+          existingFronts: ctx.existingFronts,
+          rejections: ctx.rejections,
+          emphasis: ctx.emphasis,
+          budget,
+        }),
   });
   addUsage(usage, MODEL, u);
   return parsed;
@@ -274,25 +229,22 @@ async function writeCandidates(
   usage: Usage,
   request?: string,
 ) {
-  const { parsed, usage: u } = await call<z.infer<typeof zCandidateGroups>>('stage 2 (cards)', {
+  const { parsed, usage: u } = await complete<z.infer<typeof zCandidateGroups>>({
+    stage: 'stage 2 (cards)',
     model: MODEL,
-    max_tokens: 48000,
-    thinking: { type: 'adaptive' },
-    output_config: { effort: (await config()).effortStage2, format: zodOutputFormat(zCandidateGroups) },
-    system: [{ type: 'text', text: await STAGE2_SYSTEM(), cache_control: { type: 'ephemeral' } }],
-    messages: [
-      {
-        role: 'user',
-        content: stage2BatchUser({
-          title: note.title,
-          folder: note.folder,
-          content: note.content,
-          targets,
-          count: (await config()).candidatesPerTarget,
-          request,
-        }),
-      },
-    ],
+    schema: zCandidateGroups,
+    maxTokens: 48000,
+    effort: (await config()).effortStage2,
+    contextLimit: (await config()).ollamaContext,
+    system: await STAGE2_SYSTEM(),
+    user: stage2BatchUser({
+      title: note.title,
+      folder: note.folder,
+      content: note.content,
+      targets,
+      count: (await config()).candidatesPerTarget,
+      request,
+    }),
   });
   addUsage(usage, MODEL, u);
   return parsed?.groups ?? [];
@@ -307,13 +259,15 @@ async function judge(
   }[],
   usage: Usage,
 ) {
-  const { parsed, usage: u } = await call<z.infer<typeof zBatchJudgement>>('stage 3 (judge)', {
+  const { parsed, usage: u } = await complete<z.infer<typeof zBatchJudgement>>({
+    stage: 'stage 3 (judge)',
     model: MODEL,
-    max_tokens: 32000,
-    thinking: { type: 'adaptive' },
-    output_config: { effort: (await config()).effortStage3, format: zodOutputFormat(zBatchJudgement) },
-    system: [{ type: 'text', text: await JUDGE_SYSTEM(), cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: judgeBatchUser({ folder, groups }) }],
+    schema: zBatchJudgement,
+    maxTokens: 32000,
+    effort: (await config()).effortStage3,
+    contextLimit: (await config()).ollamaContext,
+    system: await JUDGE_SYSTEM(),
+    user: judgeBatchUser({ folder, groups }),
   });
   addUsage(usage, MODEL, u);
   return parsed?.verdicts ?? [];
@@ -334,40 +288,28 @@ async function checkDuplicate(
   // neither. It doesn't need them: this is a single binary comparison, not a reasoning task.
   const cheap = MODEL_DEDUP.startsWith('claude-haiku');
 
-  const { parsed, usage: u } = await call<z.infer<typeof zEquivalence>>('dedup', {
+  const { parsed, usage: u } = await complete<z.infer<typeof zEquivalence>>({
+    stage: 'dedup',
     model: MODEL_DEDUP,
-    max_tokens: 4000,
-    ...(cheap ? {} : { thinking: { type: 'adaptive' as const } }),
-    output_config: {
-      ...(cheap ? {} : { effort: 'low' as const }),
-      format: zodOutputFormat(zEquivalence),
-    },
-    system: [
-      {
-        type: 'text',
-        text: await DEDUP_SYSTEM(),
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    messages: [
-      {
-        role: 'user',
-        content: [
-          '# Proposed card',
-          `Q: ${candidate.front}`,
-          `A: ${candidate.back ?? '(none)'}`,
-          '',
-          '# Existing cards in the deck',
-          '',
-          ...neighbours.flatMap((n, i) => [
-            `## [${i}]`,
-            `Q: ${n.front}`,
-            `A: ${n.back ?? '(none)'}`,
-            '',
-          ]),
-        ].join('\n'),
-      },
-    ],
+    schema: zEquivalence,
+    maxTokens: 4000,
+    ...(cheap ? { think: false } : { effort: 'low' as const }),
+    contextLimit: (await config()).ollamaContext,
+    system: await DEDUP_SYSTEM(),
+    user: [
+      '# Proposed card',
+      `Q: ${candidate.front}`,
+      `A: ${candidate.back ?? '(none)'}`,
+      '',
+      '# Existing cards in the deck',
+      '',
+      ...neighbours.flatMap((n, i) => [
+        `## [${i}]`,
+        `Q: ${n.front}`,
+        `A: ${n.back ?? '(none)'}`,
+        '',
+      ]),
+    ].join('\n'),
   });
   addUsage(usage, MODEL_DEDUP, u);
   return parsed;
@@ -399,10 +341,22 @@ export async function extract(
 ): Promise<ExtractionSummary> {
   const targeted = Boolean(request?.trim());
 
-  // Env wins over the config file, so a one-off run can override without editing anything.
+  // Env wins over the config file, so a one-off run can override without editing anything —
+  // including the provider, since the model name is what decides it.
   const settings = await config();
-  MODEL = process.env.LOCI_MODEL ?? settings.model;
-  MODEL_DEDUP = process.env.LOCI_MODEL_DEDUP ?? settings.modelDedup;
+  const local = settings.provider === 'ollama';
+  MODEL = process.env.LOCI_MODEL ?? (local ? settings.ollamaModel : settings.model);
+  MODEL_DEDUP = process.env.LOCI_MODEL_DEDUP ?? (local ? settings.ollamaModelDedup : settings.modelDedup);
+
+  // Fail before touching the vault, not four notes in. A scan that dies partway has already
+  // spent minutes on the diff, and on a local provider the most likely reason is the dullest
+  // one — the model was never pulled.
+  for (const m of new Set([MODEL, MODEL_DEDUP])) {
+    if (providerOf(m) !== 'ollama') continue;
+    const ready = await ollamaReady(m);
+    if (!ready.ok) throw new Error(`Extraction is set to Ollama but ${ready.reason}`);
+  }
+
   const db = supabase();
   const usage: Usage = { input: 0, output: 0, cacheWrite: 0, cacheRead: 0, calls: 0, byModel: {} };
   const perNote: ExtractionSummary['perNote'] = [];
