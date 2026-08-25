@@ -141,6 +141,14 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
   // render — `Date.now()` in a render body is impure and gives an unstable value on re-render.
   const shownAt = useRef(0);
 
+  // ── explain ────────────────────────────────────────────────────────────────
+  // Keyed by card id so a re-visited card shows what it already explained rather than asking
+  // Haiku again. `explaining` tracks only the in-flight request, so a slow one can't be confused
+  // with a card that simply has no explanation yet.
+  const [explanations, setExplanations] = useState<Record<string, string>>({});
+  const [explaining, setExplaining] = useState(false);
+  const [explainError, setExplainError] = useState<string | null>(null);
+
   const card = cards[idx];
   const done = idx >= cards.length;
   const isClaim = card?.angle === 'claim';
@@ -198,6 +206,7 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
     setTyped('');
     setVerdict(null);
     setBypass(null);
+    setExplainError(null);
     setIdx((i) => i + 1);
   }, []);
 
@@ -286,6 +295,31 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
     }
   }, [card, grading, busy, typed, autoAccept, gradeCard]);
 
+  const explainCard = useCallback(async () => {
+    if (!card || explaining || explanations[card.id]) return;
+    setExplaining(true);
+    setExplainError(null);
+    try {
+      const res = await fetch('/api/explain', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cardId: card.id }),
+      });
+      const data = (await res.json()) as
+        | { ok: true; explanation: string }
+        | { ok: false; reason: string };
+      if (data.ok) {
+        setExplanations((e) => ({ ...e, [card.id]: data.explanation }));
+      } else {
+        setExplainError(data.reason);
+      }
+    } catch {
+      setExplainError('Could not reach the explainer.');
+    } finally {
+      setExplaining(false);
+    }
+  }, [card, explaining, explanations]);
+
   /** Take the machine at its word. */
   const acceptVerdict = useCallback(() => {
     if (verdict) void gradeCard(verdict.rating);
@@ -296,6 +330,7 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
     setFlipped(true);
     setEditing(false);
     setDropping(false);
+    setExplainError(null);
     setIdx((i) => i - 1);
   }, [idx]);
 
@@ -388,6 +423,12 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
         return;
       }
 
+      if (e.key === '?') {
+        e.preventDefault();
+        void explainCard();
+        return;
+      }
+
       if (e.key === 'ArrowLeft' || e.key === 'u') {
         e.preventDefault();
         goBack();
@@ -420,7 +461,7 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
     return () => window.removeEventListener('keydown', onKey);
   }, [
     done, busy, flipped, dropping, editing, send, gradeCard, startEditing, saveEdit, goBack,
-    beginDrop, verdict, acceptVerdict, typing,
+    beginDrop, verdict, acceptVerdict, typing, explainCard,
   ]);
 
   // The answer box wants focus the moment a card arrives, so a session is type-type-enter with
@@ -584,6 +625,24 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
       </div>
       )}
 
+      {(explaining || explanations[card.id] || explainError) && (
+        <div className="rise mb-4 space-y-2 border-t border-ink-4 pt-5">
+          <span className="text-[0.6875rem] uppercase tracking-[0.18em] text-ink-3">
+            Explain
+          </span>
+          {explaining ? (
+            <p className="text-sm text-ink-3">thinking…</p>
+          ) : explanations[card.id] ? (
+            <RichText
+              text={explanations[card.id]}
+              className="text-sm leading-relaxed text-ink-2"
+            />
+          ) : (
+            <p className="text-sm text-ink-3">{explainError}</p>
+          )}
+        </div>
+      )}
+
       {dropping && (
         <div className="rise mb-4 flex items-center gap-3 border-t border-ink-4 pt-5">
           <input
@@ -653,6 +712,13 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
               <button onClick={startEditing} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>e</kbd> edit
               </button>
+              <button
+                onClick={() => void explainCard()}
+                disabled={explaining || Boolean(explanations[card.id])}
+                className="py-2 text-left transition-colors hover:text-ink disabled:opacity-40 sm:py-0"
+              >
+                <kbd>?</kbd> explain
+              </button>
               <button onClick={beginDrop} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>d</kbd> drop
               </button>
@@ -672,6 +738,13 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
             </button>
             <button onClick={startEditing} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
               <kbd>e</kbd> edit
+            </button>
+            <button
+              onClick={() => void explainCard()}
+              disabled={explaining || Boolean(explanations[card.id])}
+              className="py-2 text-left transition-colors hover:text-ink disabled:opacity-40 sm:py-0"
+            >
+              <kbd>?</kbd> explain
             </button>
             <button onClick={beginDrop} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
               <kbd>d</kbd> drop
@@ -785,6 +858,13 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
               </span>
               <button onClick={startEditing} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>e</kbd> edit
+              </button>
+              <button
+                onClick={() => void explainCard()}
+                disabled={explaining || Boolean(explanations[card.id])}
+                className="py-2 text-left transition-colors hover:text-ink disabled:opacity-40 sm:py-0"
+              >
+                <kbd>?</kbd> explain
               </button>
               <button onClick={beginDrop} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>d</kbd> drop
