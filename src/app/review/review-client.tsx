@@ -11,6 +11,7 @@ import { gradable, type GraderStatus } from '@/lib/grading';
 import {
   RATING_LABELS,
   type DueCard,
+  type ExplainResult,
   type GradeResult,
   type RatingValue,
   type StillEndorse,
@@ -107,11 +108,13 @@ export interface SessionProps {
   mode: 'new' | 'review';
   /** Resolved on the server: is there an Ollama to grade against, and which model. */
   grader: GraderStatus;
+  /** Resolved on the server: is there a model to explain a card against, and which one. */
+  explainer: GraderStatus;
   /** Commit the model's grade without waiting to be told to. Off until it has earned it. */
   autoAccept: boolean;
 }
 
-export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
+export function Review({ cards, mode, grader, explainer, autoAccept }: SessionProps) {
   const isNew = mode === 'new';
   const router = useRouter();
   const [idx, setIdx] = useState(0);
@@ -143,9 +146,9 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
 
   // ── explain ────────────────────────────────────────────────────────────────
   // Keyed by card id so a re-visited card shows what it already explained rather than asking
-  // Haiku again. `explaining` tracks only the in-flight request, so a slow one can't be confused
-  // with a card that simply has no explanation yet.
-  const [explanations, setExplanations] = useState<Record<string, string>>({});
+  // the model again. `explaining` tracks only the in-flight request, so a slow one can't be
+  // confused with a card that simply has no explanation yet.
+  const [explanations, setExplanations] = useState<Record<string, ExplainResult>>({});
   const [explaining, setExplaining] = useState(false);
   const [explainError, setExplainError] = useState<string | null>(null);
 
@@ -296,7 +299,7 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
   }, [card, grading, busy, typed, autoAccept, gradeCard]);
 
   const explainCard = useCallback(async () => {
-    if (!card || explaining || explanations[card.id]) return;
+    if (!card || explaining || explanations[card.id] || !explainer.available) return;
     setExplaining(true);
     setExplainError(null);
     try {
@@ -305,11 +308,9 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ cardId: card.id }),
       });
-      const data = (await res.json()) as
-        | { ok: true; explanation: string }
-        | { ok: false; reason: string };
+      const data = (await res.json()) as ({ ok: true } & ExplainResult) | { ok: false; reason: string };
       if (data.ok) {
-        setExplanations((e) => ({ ...e, [card.id]: data.explanation }));
+        setExplanations((e) => ({ ...e, [card.id]: data }));
       } else {
         setExplainError(data.reason);
       }
@@ -318,7 +319,7 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
     } finally {
       setExplaining(false);
     }
-  }, [card, explaining, explanations]);
+  }, [card, explaining, explanations, explainer.available]);
 
   /** Take the machine at its word. */
   const acceptVerdict = useCallback(() => {
@@ -626,15 +627,23 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
       )}
 
       {(explaining || explanations[card.id] || explainError) && (
-        <div className="rise mb-4 space-y-2 border-t border-ink-4 pt-5">
-          <span className="text-[0.6875rem] uppercase tracking-[0.18em] text-ink-3">
-            Explain
-          </span>
+        <div className="rise mb-4 space-y-3 border-l-2 border-ink-4 pl-4">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-[0.6875rem] uppercase tracking-[0.18em] text-ink-3">
+              Explain
+            </span>
+            {explanations[card.id] && (
+              <span className="font-mono text-[0.625rem] tabular-nums text-ink-4">
+                {explanations[card.id].model} ·{' '}
+                {(explanations[card.id].latency_ms / 1000).toFixed(1)}s
+              </span>
+            )}
+          </div>
           {explaining ? (
             <p className="text-sm text-ink-3">thinking…</p>
           ) : explanations[card.id] ? (
             <RichText
-              text={explanations[card.id]}
+              text={explanations[card.id].explanation}
               className="text-sm leading-relaxed text-ink-2"
             />
           ) : (
@@ -714,7 +723,8 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
               </button>
               <button
                 onClick={() => void explainCard()}
-                disabled={explaining || Boolean(explanations[card.id])}
+                disabled={!explainer.available || explaining || Boolean(explanations[card.id])}
+                title={explainer.available ? undefined : (explainer.reason ?? undefined)}
                 className="py-2 text-left transition-colors hover:text-ink disabled:opacity-40 sm:py-0"
               >
                 <kbd>?</kbd> explain
@@ -741,7 +751,8 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
             </button>
             <button
               onClick={() => void explainCard()}
-              disabled={explaining || Boolean(explanations[card.id])}
+              disabled={!explainer.available || explaining || Boolean(explanations[card.id])}
+              title={explainer.available ? undefined : (explainer.reason ?? undefined)}
               className="py-2 text-left transition-colors hover:text-ink disabled:opacity-40 sm:py-0"
             >
               <kbd>?</kbd> explain
@@ -861,7 +872,8 @@ export function Review({ cards, mode, grader, autoAccept }: SessionProps) {
               </button>
               <button
                 onClick={() => void explainCard()}
-                disabled={explaining || Boolean(explanations[card.id])}
+                disabled={!explainer.available || explaining || Boolean(explanations[card.id])}
+                title={explainer.available ? undefined : (explainer.reason ?? undefined)}
                 className="py-2 text-left transition-colors hover:text-ink disabled:opacity-40 sm:py-0"
               >
                 <kbd>?</kbd> explain

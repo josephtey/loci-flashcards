@@ -2,7 +2,15 @@ import 'server-only';
 import { complete, providerReady, OLLAMA_MODEL } from './llm';
 import { readConfig, readPrompt } from './prompt-store';
 import { askedOf, type GraderStatus } from './grading';
-import { ANGLE_DESCRIPTIONS, zRecallVerdict, type CardRow, type GradeResult } from './types';
+import {
+  ANGLE_DESCRIPTIONS,
+  zExplanation,
+  zRecallVerdict,
+  type CardRow,
+  type Explanation,
+  type ExplainResult,
+  type GradeResult,
+} from './types';
 
 /**
  * The auto-grader: reads a typed recall attempt and puts one of the four grades on it.
@@ -108,3 +116,56 @@ export async function gradeAnswer(card: Card, typed: string): Promise<GradeResul
  * only so the review screen's opening fetch has somewhere to land.
  */
 export async function warm(): Promise<void> {}
+
+/**
+ * The "explain this" button, for a card you got stuck on.
+ *
+ * Same provider switch as grading, same reason: this is an ungraded aside, not part of the
+ * scored pipeline, so it belongs on the cheap model on either provider — `gpt-oss:120b` on
+ * Ollama, `modelDedup` (Haiku) on Anthropic — not on whatever `model` extraction is currently
+ * tuned to.
+ */
+async function explainerModel(): Promise<string> {
+  const cfg = await readConfig();
+  return cfg.provider === 'ollama' ? OLLAMA_MODEL : cfg.modelDedup;
+}
+
+/** Is there an explainer to talk to? Asked before the review screen enables the button. */
+export async function explainerStatus(): Promise<GraderStatus> {
+  const model = await explainerModel();
+  const ready = await providerReady(model);
+  return { available: ready.ok, reason: ready.reason ?? null, model };
+}
+
+type ExplainCard = Pick<CardRow, 'front' | 'back' | 'cloze_text' | 'context'>;
+
+function explainBrief(card: ExplainCard): string {
+  const parts = [
+    `Card front: ${card.cloze_text ?? card.front}`,
+    card.back ? `Card back: ${card.back}` : null,
+    card.context ? `Context: ${card.context}` : null,
+    '',
+    'Explain the concept this card is testing.',
+  ];
+  return parts.filter(Boolean).join('\n');
+}
+
+export async function explainCard(card: ExplainCard): Promise<ExplainResult> {
+  const model = await explainerModel();
+  const started = Date.now();
+
+  const { parsed } = await complete<Explanation>({
+    stage: 'explain',
+    model,
+    schema: zExplanation,
+    maxTokens: 400,
+    // Same carve-out as grading: modelDedup is a Haiku that rejects `effort` outright, and this
+    // is a short, low-stakes aside — not worth paying for thinking on either provider.
+    think: false,
+    system: await readPrompt('explain'),
+    user: explainBrief(card),
+  });
+
+  if (!parsed) throw new Error('The explainer returned nothing.');
+  return { ...parsed, model, latency_ms: Date.now() - started };
+}

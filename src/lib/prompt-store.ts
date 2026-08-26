@@ -56,6 +56,13 @@ export const PROMPT_FILES = {
       'rather than Claude, and none of the shared principles apply — this one is about ' +
       'measuring retrieval, not writing prompts.',
   },
+  explain: {
+    title: 'Explain a card',
+    file: 'explain.md',
+    role:
+      'A short, ungraded aside for a card you got stuck on. Follows the same provider switch ' +
+      'as grading — none of the shared principles apply here either.',
+  },
   principles: {
     title: 'Principles',
     root: 'docs',
