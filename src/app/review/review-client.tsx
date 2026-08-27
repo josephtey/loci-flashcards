@@ -299,7 +299,8 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
   }, [card, grading, busy, typed, autoAccept, gradeCard]);
 
   const explainCard = useCallback(async () => {
-    if (!card || explaining || explanations[card.id] || !explainer.available) return;
+    // Elaborates on the answer — nothing to elaborate on before it's revealed.
+    if (!card || !flipped || explaining || explanations[card.id] || !explainer.available) return;
     setExplaining(true);
     setExplainError(null);
     try {
@@ -319,7 +320,7 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
     } finally {
       setExplaining(false);
     }
-  }, [card, explaining, explanations, explainer.available]);
+  }, [card, flipped, explaining, explanations, explainer.available]);
 
   /** Take the machine at its word. */
   const acceptVerdict = useCallback(() => {
@@ -424,7 +425,8 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
         return;
       }
 
-      if (e.key === '?') {
+      // Elaborates on the answer, so it only makes sense once the answer is on screen.
+      if (e.key === '?' && flipped) {
         e.preventDefault();
         void explainCard();
         return;
@@ -626,7 +628,9 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
       </div>
       )}
 
-      {(explaining || explanations[card.id] || explainError) && (
+      {/* Elaborates on the answer, so it only shows alongside it — never on the question side,
+          and not left dangling if you flip back before grading. */}
+      {flipped && (explaining || explanations[card.id] || explainError) && (
         <div className="rise mb-4 space-y-3 border-l-2 border-ink-4 pl-4">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <span className="text-[0.6875rem] uppercase tracking-[0.18em] text-ink-3">
@@ -721,14 +725,6 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
               <button onClick={startEditing} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>e</kbd> edit
               </button>
-              <button
-                onClick={() => void explainCard()}
-                disabled={!explainer.available || explaining || Boolean(explanations[card.id])}
-                title={explainer.available ? undefined : (explainer.reason ?? undefined)}
-                className="py-2 text-left transition-colors hover:text-ink disabled:opacity-40 sm:py-0"
-              >
-                <kbd>?</kbd> explain
-              </button>
               <button onClick={beginDrop} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>d</kbd> drop
               </button>
@@ -748,14 +744,6 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
             </button>
             <button onClick={startEditing} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
               <kbd>e</kbd> edit
-            </button>
-            <button
-              onClick={() => void explainCard()}
-              disabled={!explainer.available || explaining || Boolean(explanations[card.id])}
-              title={explainer.available ? undefined : (explainer.reason ?? undefined)}
-              className="py-2 text-left transition-colors hover:text-ink disabled:opacity-40 sm:py-0"
-            >
-              <kbd>?</kbd> explain
             </button>
             <button onClick={beginDrop} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
               <kbd>d</kbd> drop

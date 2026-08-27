@@ -142,10 +142,10 @@ type ExplainCard = Pick<CardRow, 'front' | 'back' | 'cloze_text' | 'context'>;
 function explainBrief(card: ExplainCard): string {
   const parts = [
     `Card front: ${card.cloze_text ?? card.front}`,
-    card.back ? `Card back: ${card.back}` : null,
+    card.back ? `Card answer: ${card.back}` : null,
     card.context ? `Context: ${card.context}` : null,
     '',
-    'Explain the concept this card is testing.',
+    'Elaborate on the answer above — go deeper than the answer text itself.',
   ];
   return parts.filter(Boolean).join('\n');
 }
