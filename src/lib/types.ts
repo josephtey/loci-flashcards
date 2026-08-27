@@ -266,6 +266,17 @@ export interface GradeResult extends RecallVerdict {
   latency_ms: number;
 }
 
+export const zExplanation = z.object({
+  explanation: z.string().describe('Two or three sentences, plain language, prose only.'),
+});
+export type Explanation = z.infer<typeof zExplanation>;
+
+/** An explanation plus what it cost to get, the same shape as `GradeResult`. */
+export interface ExplainResult extends Explanation {
+  model: string;
+  latency_ms: number;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Row shapes (hand-written rather than generated; the schema is small and stable)
 // ─────────────────────────────────────────────────────────────────────────────

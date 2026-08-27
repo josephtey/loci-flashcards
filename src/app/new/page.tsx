@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { graderStatus } from '@/lib/grader';
+import { explainerStatus, graderStatus } from '@/lib/grader';
 import { readConfig } from '@/lib/prompt-store';
 import { newCards } from '@/lib/queries';
 import { Review } from '../review/review-client';
@@ -7,7 +7,12 @@ import { Review } from '../review/review-client';
 export const dynamic = 'force-dynamic';
 
 export default async function NewPage() {
-  const [cards, grader, config] = await Promise.all([newCards(), graderStatus(), readConfig()]);
+  const [cards, grader, explainer, config] = await Promise.all([
+    newCards(),
+    graderStatus(),
+    explainerStatus(),
+    readConfig(),
+  ]);
 
   if (!cards.length) {
     return (
@@ -20,5 +25,13 @@ export default async function NewPage() {
     );
   }
 
-  return <Review cards={cards} mode="new" grader={grader} autoAccept={config.graderAutoAccept} />;
+  return (
+    <Review
+      cards={cards}
+      mode="new"
+      grader={grader}
+      explainer={explainer}
+      autoAccept={config.graderAutoAccept}
+    />
+  );
 }
