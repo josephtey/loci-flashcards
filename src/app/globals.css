@@ -33,6 +33,11 @@
   --sev-3: #bda04e;
   --sev-4: #8fa25c;
   --sev-5: #6e9e6e;
+
+  /* Today's work. Deliberately off the severity ramp and off the memory ramp — it answers a
+     different question from either ("did I touch this?" rather than "how is it doing?"), so it
+     must not read as a sixth level of anything. */
+  --today: #9d8ac8;
 }
 
 @theme inline {
@@ -54,6 +59,7 @@
   --color-sev-3: var(--sev-3);
   --color-sev-4: var(--sev-4);
   --color-sev-5: var(--sev-5);
+  --color-today: var(--today);
   --breakpoint-xs: 26rem;
   --font-sans: var(--font-sans-stack);
   --font-mono: var(--font-mono-stack);

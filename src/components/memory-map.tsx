@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { SEV } from '@/components/deck-health';
 import { BANDS, bandOf, LOST_AT, SLIPPED_AT } from '@/lib/health';
 import type { Memory, MemoryCard } from '@/lib/queries';
@@ -27,6 +27,11 @@ const PLOT_H = 190;
 const rOf = (stability: number) => 3 + Math.min(1.8, Math.max(0, Math.log10(stability) * 0.95));
 
 const pct = (r: number) => Math.floor(r * 100);
+
+/** How long a card takes to travel, and how much later each one sets off than the last. */
+const FLIGHT_MS = 1100;
+const STAGGER_MS = 26;
+const MAX_STAGGER_MS = 700;
 
 function relative(days: number): string {
   const n = Math.round(Math.abs(days));
@@ -128,8 +133,63 @@ export function MemoryMap({ memory }: { memory: Memory }) {
     [cards, tMax, maxX],
   );
 
-  const top = Math.min(TOP, ...nodes.map((n) => n.y - n.r)) - 6;
-  const bottom = Math.max(TOP + PLOT_H, ...nodes.map((n) => n.y + n.r)) + 6;
+  const todayCount = cards.filter((c) => c.reviewedToday).length;
+
+  /**
+   * The same layout, but with today's cards where they were when you sat down.
+   *
+   * Settled separately rather than by moving dots around the finished layout: a card that has
+   * flown back to 85% has to make room among the cards already there, and its old neighbours have
+   * to close the gap it left. Only the reviewed ones move — everything else was where it is now.
+   */
+  const before = useMemo(() => {
+    if (!todayCount) return null;
+    const laid = settle(
+      cards,
+      (c) => px(c.before?.x ?? c.x),
+      (c) => py(c.before?.r ?? c.r),
+    );
+    return new Map(laid.map((n) => [n.card.id, n]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, tMax, maxX, todayCount]);
+
+  /**
+   * `armed` puts the cards back with the transition switched off, so nothing is seen to jump;
+   * `running` turns the transition on and lets them travel to where they actually are.
+   */
+  const [replay, setReplay] = useState<'idle' | 'armed' | 'running'>('idle');
+
+  useEffect(() => {
+    if (replay === 'armed') {
+      // Someone who has asked for less motion still gets the information — the cards go back to
+      // where they were and hold there for a beat, then return. Two still frames rather than a
+      // flight across the chart.
+      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        const t = setTimeout(() => setReplay('idle'), 1400);
+        return () => clearTimeout(t);
+      }
+      // Two frames: one for the browser to paint the cards in their old places, one to change
+      // the target. Inside a single frame it coalesces into no movement at all.
+      let inner = 0;
+      const outer = requestAnimationFrame(() => {
+        inner = requestAnimationFrame(() => setReplay('running'));
+      });
+      return () => {
+        cancelAnimationFrame(outer);
+        cancelAnimationFrame(inner);
+      };
+    }
+    if (replay === 'running') {
+      const t = setTimeout(() => setReplay('idle'), FLIGHT_MS + MAX_STAGGER_MS + 150);
+      return () => clearTimeout(t);
+    }
+  }, [replay]);
+
+  // Both layouts, not just the settled one: during a replay a card is somewhere it no longer
+  // belongs, and a frame sized only to where things end up would clip it on the way in.
+  const spread = [...nodes, ...(before ? before.values() : [])];
+  const top = Math.min(TOP, ...spread.map((n) => n.y - n.r)) - 6;
+  const bottom = Math.max(TOP + PLOT_H, ...spread.map((n) => n.y + n.r)) + 6;
   const labelY = bottom + 13;
 
   const d = curve.map((p, i) => `${i ? 'L' : 'M'}${px(p.x).toFixed(1)} ${py(p.r).toFixed(1)}`).join(' ');
@@ -161,6 +221,22 @@ export function MemoryMap({ memory }: { memory: Memory }) {
             </span>
           );
         })}
+
+        {/* Today's work, in its own colour and on its own side of the row — it is not a sixth
+            band, it is a different question about the same dots. */}
+        {todayCount > 0 && (
+          <button
+            onClick={() => setReplay('armed')}
+            disabled={replay !== 'idle'}
+            title="Put today's cards back where they were this morning, and watch them return"
+            className="ml-auto flex items-center gap-1.5 text-[0.6875rem] text-ink-3 transition-colors hover:text-ink disabled:opacity-60"
+          >
+            <span className="h-[7px] w-[7px] rounded-full ring-[1.5px] ring-today ring-inset" />
+            reviewed today
+            <span className="font-mono tabular-nums">{todayCount}</span>
+            <span className="text-today">{replay === 'idle' ? '· replay' : '· ↑'}</span>
+          </button>
+        )}
       </div>
 
       <svg
@@ -195,22 +271,39 @@ export function MemoryMap({ memory }: { memory: Memory }) {
 
         <path d={d} fill="none" className="stroke-ink-3" strokeWidth={1.25} opacity={0.55} />
 
-        {nodes.map(({ card, x, y, r }) => {
+        {nodes.map(({ card, x, y, r }, i) => {
           const band = bandOf(card.r);
           const on = shown?.id === card.id;
+          const back = replay === 'armed' && before ? before.get(card.id) : null;
+          const at = back ?? { x, y };
+          // Only today's cards travel, so only they need staggering — and staggering by their
+          // index among *all* cards would leave most of the delay budget on cards standing still.
+          const delay = Math.min(MAX_STAGGER_MS, i * STAGGER_MS);
           return (
-            <circle
+            <g
               key={card.id}
-              cx={x}
-              cy={y}
-              r={on ? r + 2.5 : r}
-              className={`${SEV[band.sev].fill} cursor-pointer`}
-              opacity={on ? 1 : 0.88}
-              onMouseEnter={() => setPicked(card)}
-              onClick={() => setPicked(card)}
+              transform={`translate(${at.x.toFixed(1)} ${at.y.toFixed(1)})`}
+              style={
+                replay === 'running' && card.reviewedToday
+                  ? { transition: `transform ${FLIGHT_MS}ms cubic-bezier(0.22, 0.61, 0.36, 1) ${delay}ms` }
+                  : undefined
+              }
             >
-              <title>{`${pct(card.r)}% · ${card.asks}`}</title>
-            </circle>
+              <circle
+                cx={0}
+                cy={0}
+                r={on ? r + 2.5 : r}
+                className={`${SEV[band.sev].fill} cursor-pointer`}
+                // While a replay is on, everything that did not move gets out of the way.
+                opacity={replay !== 'idle' && !card.reviewedToday ? 0.18 : on ? 1 : 0.88}
+                stroke={card.reviewedToday ? 'var(--today)' : undefined}
+                strokeWidth={card.reviewedToday ? 1.6 : undefined}
+                onMouseEnter={() => setPicked(card)}
+                onClick={() => setPicked(card)}
+              >
+                <title>{`${pct(card.r)}% · ${card.asks}`}</title>
+              </circle>
+            </g>
           );
         })}
 

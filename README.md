@@ -136,6 +136,12 @@ moves it off the line in some direction. Horizontal position is what survives th
 half a percentage point out); vertical is not. A horizontal band would have told you a card packed
 below the 80% line was slipping when it isn't.
 
+Cards graded today wear a violet ring, and **replay** puts them back where they were when you sat
+down and lets them fly home. The old position is not a guess: every review writes `state_before`,
+so the first grade of the day records the exact stability and last-review date you walked in on.
+Both layouts are settled separately — a card flying back to 85% has to make room among the cards
+already there. Today that is 23 cards moving 85% to 99%.
+
 Cards settle into place by pushing each other apart against a spring pulling each back to where it
 belongs, rather than stacking into a lattice. Forty-eight of them currently sit within a percentage
 point of each other; drawn strictly on the line they would be one dot with forty-seven hidden

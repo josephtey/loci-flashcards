@@ -323,6 +323,14 @@ export interface MemoryCard {
   stability: number;
   /** Negative means overdue. */
   dueInDays: number;
+  /** Graded at least once today. */
+  reviewedToday: boolean;
+  /**
+   * Where this card sat when you sat down today, from the `state_before` of its first grade of
+   * the day. Null when there is nothing to compare against: a card not reviewed today, or one
+   * met for the very first time today and so having no earlier position at all.
+   */
+  before: { x: number; r: number } | null;
 }
 
 export interface Memory {
@@ -353,14 +361,48 @@ export interface Memory {
  */
 export async function memory(now = new Date()): Promise<Memory> {
   const db = supabase();
-  const { data, error } = await db
-    .from('card_states')
-    .select(
-      'due, stability, difficulty, last_review, state, elapsed_days, scheduled_days, reps, lapses, learning_steps, cards!inner(id, status, type, front, back, cloze_text, notes(title))',
-    )
-    .eq('cards.status', 'active')
-    .gt('reps', 0);
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const [{ data, error }, { data: todays }] = await Promise.all([
+    db
+      .from('card_states')
+      .select(
+        'due, stability, difficulty, last_review, state, elapsed_days, scheduled_days, reps, lapses, learning_steps, cards!inner(id, status, type, front, back, cloze_text, notes(title))',
+      )
+      .eq('cards.status', 'active')
+      .gt('reps', 0),
+    // Ascending, so the first row seen for a card is the first time you graded it today — the
+    // state you actually walked in on, not what it looked like after two earlier attempts.
+    db
+      .from('reviews')
+      .select('card_id, reviewed_at, state_before')
+      .eq('action', 'grade')
+      .gte('reviewed_at', startOfDay.toISOString())
+      .order('reviewed_at', { ascending: true }),
+  ]);
   if (error) throw new Error(error.message);
+
+  const walkedInOn = new Map<string, { x: number; r: number } | null>();
+  for (const row of todays ?? []) {
+    const id = row.card_id as string;
+    if (walkedInOn.has(id)) continue;
+    const b = row.state_before as { stability?: number | null; last_review?: string | null } | null;
+    // A card met for the first time today has no earlier position — there was no memory to be
+    // at a point on the curve. It is marked as reviewed and simply has nowhere to have come from.
+    if (!b?.stability || !b.last_review) {
+      walkedInOn.set(id, null);
+      continue;
+    }
+    const at = new Date(row.reviewed_at as string);
+    const r = retrievability(b as Partial<CardStateRow>, 0, at);
+    walkedInOn.set(
+      id,
+      r === null
+        ? null
+        : { x: (at.getTime() - new Date(b.last_review).getTime()) / 86_400_000 / b.stability, r },
+    );
+  }
 
   const cards: MemoryCard[] = [];
   const scheduledRs: number[] = [];
@@ -380,6 +422,8 @@ export async function memory(now = new Date()): Promise<Memory> {
       x: (now.getTime() - new Date(state.last_review).getTime()) / 86_400_000 / state.stability,
       stability: state.stability,
       dueInDays: (new Date(state.due!).getTime() - now.getTime()) / 86_400_000,
+      reviewedToday: walkedInOn.has(c.id),
+      before: walkedInOn.get(c.id) ?? null,
     });
 
     if (Number(state.scheduled_days) >= 1) scheduledRs.push(r);
