@@ -117,13 +117,29 @@ export function retrievability(
  * Computed at stability 1 so `elapsed_days` reads as `x` directly. Sent to the browser once and
  * reused for every card, which is exact rather than a convenience: a card's own curve in days is
  * this curve with the x-axis multiplied by its stability.
- *
- * The default horizon runs to x = 8, which is where recall reaches roughly 60% — the point below
- * which a card is treated as gone. Drawing further would spend the plot on a tail nothing acts on.
  */
-export function universalCurve(maxX = 8, steps = 64): { x: number; r: number }[] {
+
+/**
+ * The curve is drawn against log time, and it has to be.
+ *
+ * Recall reaches 90% at x = 1 and 80% at x = 3.3, but it does not reach 60% until x = 27 — the
+ * tail is enormous. On a linear axis long enough to show the whole shape, every card in a healthy
+ * deck is crushed into the leftmost tenth. Ebbinghaus plotted his against log time for the same
+ * reason. `log1p(x / K)` also keeps x = 0 finite, which a plain log does not, and a just-reviewed
+ * card sits at exactly x = 0.
+ */
+export const CURVE_K = 0.15;
+export const curveT = (x: number): number => Math.log1p(x / CURVE_K);
+
+/** How far out the curve runs: where recall reaches 60% and a card is treated as gone. */
+export const CURVE_MAX_X = 27;
+
+export function universalCurve(maxX = CURVE_MAX_X, steps = 160): { x: number; r: number }[] {
+  const tMax = curveT(maxX);
+  // Spaced evenly in the domain it will be *drawn* in, so the steep left-hand part gets the
+  // points it needs and the flat tail does not waste any.
   return Array.from({ length: steps + 1 }, (_, i) => {
-    const x = (i / steps) * maxX;
+    const x = (Math.exp((i / steps) * tMax) - 1) * CURVE_K;
     return { x, r: forgetting_curve(params.w, x, 1) };
   });
 }

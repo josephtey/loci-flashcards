@@ -1,5 +1,5 @@
 import 'server-only';
-import { retrievability, universalCurve } from './fsrs';
+import { CURVE_MAX_X, curveT, retrievability, universalCurve } from './fsrs';
 import { askedOf } from './grading';
 import { LOST_AT, SLIPPED_AT } from './health';
 import { supabase } from './supabase';
@@ -335,6 +335,9 @@ export interface Memory {
   mean: number;
   /** The one curve they all sit on, in units of stability. */
   curve: { x: number; r: number }[];
+  /** The log-time transform's full extent, so the chart maps x the same way the curve was sampled. */
+  curveT: number;
+  maxX: number;
 }
 
 /**
@@ -391,6 +394,8 @@ export async function memory(now = new Date()): Promise<Memory> {
     lost: scheduledRs.filter((v) => v < LOST_AT).length,
     mean: scheduledRs.length ? scheduledRs.reduce((a, b) => a + b, 0) / scheduledRs.length : 1,
     curve: universalCurve(),
+    curveT: curveT(CURVE_MAX_X),
+    maxX: CURVE_MAX_X,
   };
 }
 

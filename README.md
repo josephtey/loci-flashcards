@@ -114,19 +114,27 @@ position for a memory that does not exist.
 
 There is one curve, not one per card. FSRS recall depends on elapsed time only through `t / S`, so
 every card is somewhere along the same shape, and `x = 1` is by definition where recall has fallen
-to 90% — that is what stability means. Left is just-reviewed, right is on the way out. Dots are
-coloured by band: *probably gone* (under 60%), *slipping* (60–80%), **on the verge** (80–90%),
-*holding* (90–95%), *solid* (95%+).
+to 90% — that is what stability means. It is drawn against **log time**, and has to be: recall
+reaches 90% at `x = 1` and 80% at `x = 3.3`, but not 60% until `x = 27`. On a linear axis long
+enough to show the whole shape, every card in a healthy deck is crushed into the leftmost tenth.
+Ebbinghaus plotted his the same way.
 
-The middle of the curve is the point of the whole thing. A card is worth reviewing when it is on
-the verge of being forgotten: recall it at 99% and the review costs effort and buys almost nothing,
-recall it at 40% and you are learning it again from scratch. Point at any dot for the card, its
-recall, how long it holds and when it is due.
+The shaded stripe is **the verge**, the stretch of curve between 90% and 80% recall, and it is the
+point of the entire system: a card is worth reviewing when it is on the verge of being forgotten.
+Recall it at 99% and the review costs effort and buys almost nothing; recall it at 40% and you are
+learning it again from scratch.
 
-Cards fan out around their position rather than stacking on it. At the time of writing 48 sat
-within a percentage point of each other, and drawn strictly on the line they would have been one
-dot with 47 hidden underneath. The spread is mostly vertical, which costs nothing; sideways it
-shifts a card by about half a percent of recall on the densest cluster.
+The stripe runs vertically rather than horizontally because **both** axes encode recall here — a
+card sits on a one-dimensional curve, so nudging it aside to stop it hiding behind another card
+moves it off the line in some direction. Horizontal position is what survives that (a median of
+half a percentage point out); vertical is not. A horizontal band would have told you a card packed
+below the 80% line was slipping when it isn't.
+
+Cards settle into place by pushing each other apart against a spring pulling each back to where it
+belongs, rather than stacking into a lattice. Forty-eight of them currently sit within a percentage
+point of each other; drawn strictly on the line they would be one dot with forty-seven hidden
+underneath. Dot size is stability — a memory that holds for months is a bigger thing than one that
+holds for a day. Point at any dot for the card, its recall, how long it holds and when it is due.
 
 The headline on the activity graph is **days done** — every day you reviewed anything, all-time,
 and a number that only ever goes up. The streak beside it counts consecutive days with reviews. It

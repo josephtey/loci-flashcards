@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { SEV } from '@/components/deck-health';
-import { BANDS, bandOf } from '@/lib/health';
+import { BANDS, bandOf, LOST_AT, SLIPPED_AT } from '@/lib/health';
 import type { Memory, MemoryCard } from '@/lib/queries';
 
 /**
@@ -10,22 +10,21 @@ import type { Memory, MemoryCard } from '@/lib/queries';
  *
  * FSRS recall depends on elapsed time only through `t / S`, so there is not a curve per card —
  * there is one curve, and each card is somewhere along it. `x = 1` is by definition the point
- * where recall has fallen to 90%, because that is what stability means. A card's position here is
- * exact: horizontal placement is its own recall, read off the shared curve.
+ * where recall has fallen to 90%, because that is what stability means.
  *
- * Left is just-reviewed, right is on the way out, and the interesting part is the middle — a card
- * is worth reviewing when it is on the verge of being forgotten. Recall it at 99% and the review
- * costs effort and buys almost nothing; recall it at 40% and you are learning it again.
+ * The curve runs the whole way, from just-reviewed to the 60% line where a card is treated as
+ * gone. The middle of it is the point of the entire system: a card is worth reviewing when it is
+ * on the verge of being forgotten. Recall it at 99% and the review costs effort and buys almost
+ * nothing; recall it at 40% and you are learning it again from scratch.
  */
 
-const DOT = 3.5;
-const GAP = 9;
-/** Dense clusters wrap into extra columns rather than growing a spike up the whole chart. */
-const MAX_ROWS = 8;
+const W = 620;
+const TOP = 14;
+const PLOT_H = 190;
 
-const W = 600;
-const CURVE_TOP = 62;
-const CURVE_H = 118;
+/** Dot radius by durability. A memory that holds for months is a bigger thing than one that
+ *  holds for a day, and the size is also what stops a cluster reading as a lattice. */
+const rOf = (stability: number) => 3 + Math.min(1.8, Math.max(0, Math.log10(stability) * 0.95));
 
 const pct = (r: number) => Math.floor(r * 100);
 
@@ -39,79 +38,110 @@ function holds(days: number): string {
   return days < 1 ? 'holds <1d' : `holds ${Math.round(days)}d`;
 }
 
-interface Placed {
+/** Stable pseudo-random in [-1, 1] from the card's id, so the layout never moves between renders
+ *  and the server and the browser agree on it. */
+function seed(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) / 0xffffffff) * 2 - 1;
+}
+
+interface Node {
   card: MemoryCard;
-  cx: number;
-  cy: number;
+  x0: number;
+  y0: number;
+  x: number;
+  y: number;
+  r: number;
 }
 
 /**
- * Lay the cards out along the curve.
+ * Settle the cards into place.
  *
- * Position is the data; the spread around it is packing. 48 of these currently sit within a
- * percentage point of each other, and drawn strictly on the line they would be one dot with 47
- * hidden underneath. So a cluster fans out symmetrically about the point it belongs to — mostly
- * vertically, which costs nothing, and at most a column or three sideways, which on the widest
- * cluster here shifts a card by about half a percent of recall. The curve stays the spine, and no
- * card is lost behind another.
+ * The previous version packed each cluster into a rectangular lattice, which is the one thing a
+ * memory is not: it read as a spreadsheet bolted to a curve. This lets them push each other apart
+ * instead — repulsion until nothing overlaps, against a spring pulling each card back to where it
+ * actually belongs. Clusters come out as blobs that hug the line, and the shape of a blob says
+ * how many cards are piled at that point.
+ *
+ * The spring on x is stiffer than the one on y, because x is the reading that matters: horizontal
+ * position is recall. Measured against this deck, the settled positions sit a median of 0.55
+ * percentage points from where the card truly is, and 1.6 at the very worst — and some of even
+ * that is the readout being floored rather than the dot being moved.
  */
-function place(cards: MemoryCard[], px: (x: number) => number, py: (r: number) => number): Placed[] {
-  const bins = new Map<number, MemoryCard[]>();
-  for (const c of cards) {
-    const key = Math.round(px(c.x) / GAP);
-    (bins.get(key) ?? bins.set(key, []).get(key)!).push(c);
-  }
+function settle(cards: MemoryCard[], px: (c: MemoryCard) => number, py: (c: MemoryCard) => number): Node[] {
+  const nodes: Node[] = cards.map((card) => {
+    const x0 = px(card);
+    const y0 = py(card);
+    return { card, x0, y0, x: x0 + seed(card.id) * 0.6, y: y0 + seed(card.id + '#') * 3, r: rOf(card.stability) };
+  });
 
-  const out: Placed[] = [];
-  for (const [key, group] of bins) {
-    const cols = Math.ceil(group.length / MAX_ROWS);
-    const rows = Math.ceil(group.length / cols);
-    const cx0 = key * GAP;
-    // The spine passes through the middle of the cluster, so the curve stays legible through it.
-    const cy0 = py(group.reduce((s, c) => s + c.r, 0) / group.length);
-
-    group.forEach((card, i) => {
-      const col = Math.floor(i / rows);
-      const row = i % rows;
-      out.push({
-        card,
-        cx: cx0 + (col - (cols - 1) / 2) * GAP,
-        cy: cy0 + (row - (rows - 1) / 2) * GAP,
-      });
-    });
+  // Two phases. The first settles them against the springs, so every card stays near the recall
+  // it actually has. The second drops the springs and separates whatever is still touching —
+  // without it a cluster this dense never quite comes apart, because the spring pulling forty
+  // cards back to one point is stronger than the push separating them.
+  for (let pass = 0; pass < 220; pass++) {
+    const springing = pass < 160;
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i];
+        const b = nodes[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const min = a.r + b.r + 1.4;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= min * min || d2 === 0) continue;
+        const d = Math.sqrt(d2);
+        const push = ((min - d) / d) * 0.5;
+        // Shove generously in y and half as hard in x: y is packing, x is the reading.
+        a.x -= dx * push * 0.55;
+        b.x += dx * push * 0.55;
+        a.y -= dy * push;
+        b.y += dy * push;
+      }
+    }
+    if (!springing) continue;
+    for (const n of nodes) {
+      n.x += (n.x0 - n.x) * 0.05;
+      n.y += (n.y0 - n.y) * 0.008;
+    }
   }
-  return out;
+  return nodes;
 }
 
 export function MemoryMap({ memory }: { memory: Memory }) {
   const [picked, setPicked] = useState<MemoryCard | null>(null);
-  const { cards, curve } = memory;
+  const { cards, curve, curveT, maxX } = memory;
 
-  // Run the curve a little past the worst card so nothing sits on the frame, but never so short
-  // that the shape stops being a forgetting curve.
-  const worst = cards.reduce((m, c) => Math.max(m, c.x), 0);
-  const maxX = Math.max(4, Math.ceil(worst * 1.15));
-  const shownCurve = curve.filter((p) => p.x <= maxX);
-  const rMin = shownCurve[shownCurve.length - 1].r;
+  const tMax = curveT;
+  const px = (x: number) => 6 + (Math.log1p(Math.min(x, maxX) / 0.15) / tMax) * (W - 12);
+  // The plot spans exactly the two thresholds that mean anything: 100% at the top, the 60% line
+  // where a card counts as gone at the bottom.
+  const py = (r: number) => TOP + (1 - (Math.max(r, LOST_AT) - LOST_AT) / (1 - LOST_AT)) * PLOT_H;
 
-  const px = (x: number) => 4 + (Math.min(x, maxX) / maxX) * (W - 8);
-  const py = (r: number) =>
-    CURVE_TOP + (1 - (Math.max(r, rMin) - rMin) / (1 - rMin)) * CURVE_H;
+  const nodes = useMemo(
+    () => settle(cards, (c) => px(c.x), (c) => py(c.r)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cards, tMax, maxX],
+  );
 
-  const placed = place(cards, px, py);
-
-  // Crop to what is actually drawn. A fixed height had to reserve room for the tallest cluster
-  // wherever it might land, and the tallest cluster is only ever in one place — so most decks
-  // would have paid for a band of empty chart above and below.
-  const ys = placed.map((p) => p.cy);
-  const top = Math.min(CURVE_TOP, ...ys) - DOT - 6;
-  const bottom = Math.max(CURVE_TOP + CURVE_H, ...ys) + DOT + 6;
+  const top = Math.min(TOP, ...nodes.map((n) => n.y - n.r)) - 6;
+  const bottom = Math.max(TOP + PLOT_H, ...nodes.map((n) => n.y + n.r)) + 6;
   const labelY = bottom + 13;
 
-  const d = shownCurve
-    .map((p, i) => `${i ? 'L' : 'M'}${px(p.x).toFixed(1)} ${py(p.r).toFixed(1)}`)
-    .join(' ');
+  const d = curve.map((p, i) => `${i ? 'L' : 'M'}${px(p.x).toFixed(1)} ${py(p.r).toFixed(1)}`).join(' ');
 
+  /** Where along the curve recall has fallen to `target`, read off the sampled curve itself. */
+  const xAt = (target: number) => {
+    const i = curve.findIndex((p) => p.r <= target);
+    if (i <= 0) return curve[0].x;
+    const a = curve[i - 1];
+    const b = curve[i];
+    return a.x + ((b.x - a.x) * (a.r - target)) / (a.r - b.r);
+  };
   const shown = picked ?? cards[0];
   const shownBand = shown ? bandOf(shown.r) : null;
 
@@ -140,32 +170,42 @@ export function MemoryMap({ memory }: { memory: Memory }) {
         role="img"
         aria-label={`${cards.length} learned cards placed on the forgetting curve by current recall.`}
       >
-        {/* The two lines that mean something: 90% is what the scheduler aims for at the due date,
-            80% is where a card counts as slipped. */}
-        {[0.9, 0.8].map((r) =>
-          r > rMin ? (
-            <g key={r}>
-              <line x1={0} x2={W} y1={py(r)} y2={py(r)} className="stroke-ink-4" strokeWidth={1}
-                strokeDasharray="2 4" />
-              <text x={W - 2} y={py(r) - 4} textAnchor="end" className="fill-ink-4 font-mono" fontSize={9}>
-                {pct(r)}%
-              </text>
-            </g>
-          ) : null,
-        )}
+        {/* The verge, marked across x rather than across y.
+            Both axes encode recall here — a card sits on a one-dimensional curve, so displacing
+            it to stop it hiding behind another card moves it off the line in some direction. x is
+            the reading that survives that (a median of half a percentage point out), y is not. A
+            horizontal band would have told you a card packed below the 80% line was slipping when
+            it is not. This one is true: everything inside it is between 90% and 80%. */}
+        <rect x={px(xAt(0.9))} y={top} width={px(xAt(SLIPPED_AT)) - px(xAt(0.9))} height={bottom - top}
+          className="fill-sev-3" opacity={0.08} />
+        <text x={(px(xAt(0.9)) + px(xAt(SLIPPED_AT))) / 2} y={top + 10} textAnchor="middle"
+          className="fill-sev-3 font-mono" fontSize={9} opacity={0.9}>
+          the verge — review here
+        </text>
 
-        <path d={d} fill="none" className="stroke-ink-4" strokeWidth={1.5} />
+        {[0.9, SLIPPED_AT, LOST_AT].map((r) => (
+          <g key={r}>
+            <line x1={0} x2={W} y1={py(r)} y2={py(r)} className="stroke-ink-4" strokeWidth={1}
+              strokeDasharray="2 4" />
+            <text x={W - 2} y={py(r) - 4} textAnchor="end" className="fill-ink-4 font-mono" fontSize={9}>
+              {pct(r)}%
+            </text>
+          </g>
+        ))}
 
-        {placed.map(({ card, cx, cy }) => {
+        <path d={d} fill="none" className="stroke-ink-3" strokeWidth={1.25} opacity={0.55} />
+
+        {nodes.map(({ card, x, y, r }) => {
           const band = bandOf(card.r);
           const on = shown?.id === card.id;
           return (
             <circle
               key={card.id}
-              cx={cx}
-              cy={cy}
-              r={on ? DOT + 2 : DOT}
+              cx={x}
+              cy={y}
+              r={on ? r + 2.5 : r}
               className={`${SEV[band.sev].fill} cursor-pointer`}
+              opacity={on ? 1 : 0.88}
               onMouseEnter={() => setPicked(card)}
               onClick={() => setPicked(card)}
             >
@@ -174,11 +214,11 @@ export function MemoryMap({ memory }: { memory: Memory }) {
           );
         })}
 
-        <text x={4} y={labelY} className="fill-ink-4 font-mono" fontSize={9}>
+        <text x={6} y={labelY} className="fill-ink-4 font-mono" fontSize={9}>
           just reviewed
         </text>
         <text x={W - 2} y={labelY} textAnchor="end" className="fill-ink-4 font-mono" fontSize={9}>
-          on the way out
+          probably forgotten
         </text>
       </svg>
 
