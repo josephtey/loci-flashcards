@@ -76,6 +76,12 @@ reason is written to `extraction_feedback` to sharpen later runs.
 negatives, and the variety of prompts it permits. Three lapses routes a card to rewrite, because a
 prompt you keep forgetting is a broken prompt, not a broken memory.
 
+Once the answer is up, <kbd>?</kbd> asks the model to elaborate on it and <kbd>c</kbd> copies the
+whole card — question, answer, context, the source passage it was written from, angle and tags — as
+markdown, for asking follow-up questions somewhere a conversation is possible. Both live on the
+answer side because both contain the answer; offering either while you are still trying to remember
+would spoil the card to save a keystroke.
+
 ### Daily goals
 
 The home page leads with today, not the deck total — a total only goes up when you write more, so

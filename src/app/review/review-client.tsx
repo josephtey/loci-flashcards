@@ -5,6 +5,7 @@ import { HomeButton } from '@/components/home-button';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { RichText } from '@/components/rich-text';
+import { cardContext } from '@/lib/card-context';
 import { hasCloze, renderCloze } from '@/lib/cloze';
 import { formatInterval, preview } from '@/lib/fsrs';
 import { gradable, type GraderStatus } from '@/lib/grading';
@@ -144,6 +145,11 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
   // render — `Date.now()` in a render body is impure and gives an unstable value on re-render.
   const shownAt = useRef(0);
 
+  // ── copy for a chat ────────────────────────────────────────────────────────
+  // Holds the id of the card just copied, so the confirmation belongs to that card and moving on
+  // clears it rather than leaving "copied" under a card you have not copied.
+  const [copied, setCopied] = useState<string | null>(null);
+
   // ── explain ────────────────────────────────────────────────────────────────
   // Keyed by card id so a re-visited card shows what it already explained rather than asking
   // the model again. `explaining` tracks only the in-flight request, so a slow one can't be
@@ -210,6 +216,7 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
     setVerdict(null);
     setBypass(null);
     setExplainError(null);
+    setCopied(null);
     setIdx((i) => i + 1);
   }, []);
 
@@ -298,6 +305,30 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
     }
   }, [card, grading, busy, typed, autoAccept, gradeCard]);
 
+  /**
+   * Put the whole card on the clipboard, for asking somewhere else.
+   *
+   * Only once the answer is up: the block contains the answer, and copying it while you are still
+   * trying to remember would spoil the card to save two keystrokes. Same reason explain sits on
+   * this side.
+   */
+  const copyCard = useCallback(async () => {
+    if (!card || !flipped) return;
+    try {
+      // Mirror what is actually on screen: an edited card renders as plain front/back, so its
+      // cloze source goes with the edit. Copying the original would hand over text you changed.
+      const patch = patched[card.id];
+      await navigator.clipboard.writeText(
+        cardContext(patch ? { ...card, ...patch, cloze_text: null } : card),
+      );
+      setCopied(card.id);
+    } catch {
+      // A browser can refuse this outright — no permission, or an insecure origin. Saying so
+      // beats a button that silently does nothing.
+      setCopied('failed');
+    }
+  }, [card, flipped, patched]);
+
   const explainCard = useCallback(async () => {
     // Elaborates on the answer — nothing to elaborate on before it's revealed.
     if (!card || !flipped || explaining || explanations[card.id] || !explainer.available) return;
@@ -333,6 +364,7 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
     setEditing(false);
     setDropping(false);
     setExplainError(null);
+    setCopied(null);
     setIdx((i) => i - 1);
   }, [idx]);
 
@@ -432,6 +464,13 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
         return;
       }
 
+      // Same reason: the block it copies contains the answer.
+      if (e.key === 'c' && flipped) {
+        e.preventDefault();
+        void copyCard();
+        return;
+      }
+
       if (e.key === 'ArrowLeft' || e.key === 'u') {
         e.preventDefault();
         goBack();
@@ -464,7 +503,7 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
     return () => window.removeEventListener('keydown', onKey);
   }, [
     done, busy, flipped, dropping, editing, send, gradeCard, startEditing, saveEdit, goBack,
-    beginDrop, verdict, acceptVerdict, typing, explainCard,
+    beginDrop, verdict, acceptVerdict, typing, explainCard, copyCard,
   ]);
 
   // The answer box wants focus the moment a card arrives, so a session is type-type-enter with
@@ -724,6 +763,20 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
               </button>
               <button onClick={startEditing} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>e</kbd> edit
+              </button>
+              <button
+                onClick={() => void copyCard()}
+                title="Copy the question, answer, context and source passage as markdown"
+                className="py-2 text-left transition-colors hover:text-ink sm:py-0"
+              >
+                <kbd>c</kbd>{' '}
+                {copied === card.id ? (
+                  <span className="text-mem-long">copied</span>
+                ) : copied === 'failed' ? (
+                  <span className="text-mem-fresh">copy blocked</span>
+                ) : (
+                  'copy'
+                )}
               </button>
               <button onClick={beginDrop} className="py-2 text-left transition-colors hover:text-ink sm:py-0">
                 <kbd>d</kbd> drop
