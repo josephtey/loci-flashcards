@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ActivityGraph } from '@/components/activity-graph';
 import { DeckHealthLine } from '@/components/deck-health';
 import { HomeSync } from '@/components/home-sync';
+import { RefreshOnResume } from '@/components/refresh-on-resume';
 import { MemoryMap } from '@/components/memory-map';
 import { vaultStatus } from '@/lib/environment';
 import { dayPlan } from '@/lib/goals';
@@ -96,6 +97,10 @@ export default async function Home() {
       >
         Methodology
       </Link>
+
+      {/* The counts below are rendered once, on the server. Coming back to a page the phone kept
+          in memory would otherwise show yesterday's. */}
+      <RefreshOnResume />
 
       <div className="rise min-w-0">
         <h1 className="text-sm uppercase tracking-[0.35em] text-ink-3">Loci</h1>
