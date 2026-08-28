@@ -10,7 +10,7 @@ export default async function AddPage() {
   const vault = await vaultStatus();
   if (!vault.available) {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-6 py-16 sm:px-8">
+      <main className="safe-b safe-t mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-6 [--safe-b-base:4rem] [--safe-t-base:4rem] sm:px-8">
         <HomeButton />
         <h1 className="text-lg font-light">Draft with AI</h1>
         <p className="mt-4 text-sm leading-relaxed text-ink-3">{vault.reason}</p>

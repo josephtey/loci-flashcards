@@ -22,7 +22,7 @@ export default async function ReviewPage() {
 
   if (!cards.length) {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center px-6">
+      <main className="safe-b safe-t [--safe-b-base:2.5rem] [--safe-t-base:2.5rem] flex min-h-dvh flex-col items-center justify-center px-6">
         <p className="rise text-ink-3">Nothing due.</p>
         <Link href="/" className="mt-8 text-sm text-ink-3 transition-colors hover:text-ink">
           Home

@@ -233,8 +233,12 @@ a,
 
 /* Notches and home indicators. `viewportFit: cover` lets the page paint under them, so anything
    pinned to an edge has to pad itself back out. */
+/* Bottom padding that grows by the home-indicator inset, and never less than the base. This used
+   to carry the inset alone, which is 0 in a browser tab — so every page ended flush against the
+   bottom of the window unless it remembered its own `pb-*`, and most of them remembered too
+   little. Pages override with --safe-b-base the same way they do the top. */
 .safe-b {
-  padding-bottom: max(env(safe-area-inset-bottom), 0px);
+  padding-bottom: calc(var(--safe-b-base, 4rem) + env(safe-area-inset-bottom, 0px));
 }
 /* Top padding that grows by the status-bar inset. Pages set their own base via --safe-t-base
    (Tailwind: `[--safe-t-base:2.5rem]`); in a normal browser tab the inset is 0 and nothing moves. */

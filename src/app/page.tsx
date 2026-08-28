@@ -89,7 +89,7 @@ export default async function Home() {
   });
 
   return (
-    <main className="safe-b safe-t relative mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center px-5 pb-40 [--safe-t-base:3.5rem] sm:px-8 sm:pb-56 sm:[--safe-t-base:5rem]">
+    <main className="safe-b safe-t relative mx-auto flex min-h-dvh w-full max-w-2xl flex-col justify-center px-5 [--safe-b-base:10rem] [--safe-t-base:3.5rem] sm:px-8 sm:[--safe-b-base:14rem] sm:[--safe-t-base:5rem]">
       <Link
         href="/methodology"
         className="absolute right-5 top-6 text-[0.6875rem] uppercase tracking-[0.2em] text-ink-3 transition-colors hover:text-ink sm:right-8 sm:top-8 sm:text-xs"

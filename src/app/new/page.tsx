@@ -17,7 +17,7 @@ export default async function NewPage() {
 
   if (!cards.length) {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-8 px-6">
+      <main className="safe-b safe-t [--safe-b-base:2.5rem] [--safe-t-base:2.5rem] flex min-h-dvh flex-col items-center justify-center gap-8 px-6">
         <p className="rise text-ink-3">Nothing new to learn.</p>
         <Link href="/" className="text-sm text-ink-3 transition-colors hover:text-ink">
           Home

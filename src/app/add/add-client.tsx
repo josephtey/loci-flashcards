@@ -173,7 +173,7 @@ export function AddClient() {
 
   if (status === 'extracting') {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-6">
+      <main className="safe-b safe-t [--safe-b-base:2.5rem] [--safe-t-base:2.5rem] flex min-h-dvh flex-col items-center justify-center gap-6 px-6">
         <div className="rise flex flex-col items-center gap-5">
           <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-ink-2" />
           <p className="text-sm text-ink-2">
@@ -196,7 +196,7 @@ export function AddClient() {
   }
 
   return (
-    <main className="safe-b safe-t mx-auto flex min-h-dvh max-w-3xl flex-col px-5 pb-6 sm:px-8 sm:pb-10 sm:[--safe-t-base:2.5rem]">
+    <main className="safe-b safe-t mx-auto flex min-h-dvh max-w-3xl flex-col px-5 sm:px-8 sm:[--safe-t-base:2.5rem]">
       {status === 'reviewing' && drafts.length > 0 && (
         <QuickReview
           cards={drafts}

@@ -14,7 +14,7 @@ export default async function LoginPage({
   const { next = '/', error } = await searchParams;
 
   return (
-    <main className="flex min-h-dvh flex-col items-center justify-center px-6">
+    <main className="safe-b safe-t [--safe-b-base:2.5rem] [--safe-t-base:2.5rem] flex min-h-dvh flex-col items-center justify-center px-6">
       <form method="post" action="/api/login" className="rise flex w-full max-w-xs flex-col gap-4">
         <input type="hidden" name="next" value={next} />
         <label className="flex flex-col gap-2">

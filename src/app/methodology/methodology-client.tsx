@@ -217,7 +217,7 @@ export function MethodologyClient() {
   );
 
   return (
-    <main className="safe-b safe-t mx-auto flex min-h-dvh max-w-3xl flex-col px-5 pb-6 sm:px-8 sm:pb-10 sm:[--safe-t-base:2.5rem]">
+    <main className="safe-b safe-t mx-auto flex min-h-dvh max-w-3xl flex-col px-5 sm:px-8 sm:[--safe-t-base:2.5rem]">
       <header className="flex flex-wrap items-baseline justify-between gap-4">
         <div>
           <HomeButton />
