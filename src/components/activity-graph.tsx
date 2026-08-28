@@ -2,23 +2,24 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { DayDetail } from '@/components/day-detail';
-import { DAILY_REVIEW_CAP } from '@/lib/goals';
 import type { Activity } from '@/lib/queries';
 
 /**
  * A year of review activity, one square per day.
  *
- * Intensity is bucketed against a daily target rather than against your own maximum. A relative
+ * Intensity is bucketed against the daily target rather than against your own maximum. A relative
  * scale would make a heavy day permanently dim the ordinary ones, which is exactly backwards for
  * a habit you want to be unremarkable — the point is that a normal day looks like a normal day.
+ *
+ * The target arrives on the payload rather than as a constant here: it is a setting now, and the
+ * whole history is re-shaded when it changes. That is the honest behaviour — the squares say "how
+ * big a day was this against what you're asking of yourself", and the second half moved.
  */
-const TARGET = DAILY_REVIEW_CAP;
-
-function level(reviews: number): number {
+function level(reviews: number, target: number): number {
   if (reviews === 0) return 0;
-  if (reviews < TARGET * 0.35) return 1;
-  if (reviews < TARGET * 0.75) return 2;
-  if (reviews < TARGET * 1.5) return 3;
+  if (reviews < target * 0.35) return 1;
+  if (reviews < target * 0.75) return 2;
+  if (reviews < target * 1.5) return 3;
   return 4;
 }
 
@@ -33,7 +34,8 @@ const FILL = [
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function ActivityGraph({ activity }: { activity: Activity }) {
-  const { days, streak, longestStreak, daysDone, todayReviews, todayLearned } = activity;
+  const { days, streak, longestStreak, daysDone, todayReviews, todayLearned, reviewTarget } =
+    activity;
   const scroller = useRef<HTMLDivElement>(null);
   const [picked, setPicked] = useState<string | null>(null);
 
@@ -112,7 +114,7 @@ export function ActivityGraph({ activity }: { activity: Activity }) {
                         className={`day-cell h-[10px] w-[10px] rounded-[2px] transition-transform hover:scale-150 ${
                           d.reviews === 0 && d.met
                             ? 'bg-transparent ring-1 ring-inset ring-mem-long/35'
-                            : FILL[level(d.reviews)]
+                            : FILL[level(d.reviews, reviewTarget)]
                         }`}
                       />
                     ) : (

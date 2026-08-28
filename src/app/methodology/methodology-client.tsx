@@ -47,6 +47,9 @@ const STAGES = [
   },
 ] as const;
 
+/** How much a day asks for. The only knobs here that change the app rather than a scan. */
+const DAILY: (keyof Config)[] = ['dailyNew', 'dailyReviewCap'];
+
 const NUMERIC: (keyof Config)[] = [
   'wordsPerTarget',
   'targetsPerNoteMax',
@@ -340,10 +343,28 @@ export function MethodologyClient() {
         <section className="mt-16 border-t border-ink-4 pt-10 pb-16">
           <h2 className="text-base font-light">Tuning</h2>
           <p className="mt-3 text-sm text-ink-3">
-            Saved on change. Applies to the next scan.
+            Saved on change. The first two apply on the next page load; the rest apply to the next
+            scan.
           </p>
 
           <div className="mt-8 space-y-5">
+            {DAILY.map((k) => (
+              <label key={k} className="flex items-baseline gap-4">
+                <input
+                  type="number"
+                  min={1}
+                  step={1}
+                  value={config[k] as number}
+                  onChange={(e) => void saveConfig({ [k]: Number(e.target.value) } as Partial<Config>)}
+                  className="w-20 shrink-0 rounded border border-ink-4 bg-surface px-2 py-1 text-right font-mono text-xs tabular-nums text-ink"
+                />
+                <span className="w-44 shrink-0 font-mono text-[0.6875rem] text-ink-2">{k}</span>
+                <span className="text-xs leading-relaxed text-ink-3">{labels[k]}</span>
+              </label>
+            ))}
+
+            <div className="!mt-8 border-t border-ink-4/60 pt-1" />
+
             {NUMERIC.map((k) => (
               <label key={k} className="flex items-baseline gap-4">
                 <input

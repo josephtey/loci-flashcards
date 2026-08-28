@@ -93,6 +93,8 @@ export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
 export type Effort = (typeof EFFORTS)[number];
 
 export interface Config {
+  dailyNew: number;
+  dailyReviewCap: number;
   wordsPerTarget: number;
   targetsPerNoteMax: number;
   candidatesPerTarget: number;
@@ -115,6 +117,12 @@ export interface Config {
 }
 
 export const CONFIG_LABELS: Record<keyof Config, string> = {
+  dailyNew:
+    'New cards to meet in a day. Every one of these becomes roughly 8-10 reviews spread over ' +
+    'its life, so this is the number that sets the permanent load.',
+  dailyReviewCap:
+    'The most reviews a day will ask for, however far behind the deck is. A ceiling on the dig, ' +
+    'not a quota \u2014 clearing what is due is usually well under it.',
   wordsPerTarget: 'Words of substance per target proposed. Lower = denser coverage.',
   targetsPerNoteMax: 'Hard ceiling on targets from one note.',
   candidatesPerTarget: 'Draft cards written per target, before filtering.',
@@ -147,6 +155,8 @@ export const CONFIG_LABELS: Record<keyof Config, string> = {
 const CONFIG_FILE = 'config.json';
 
 export const DEFAULT_CONFIG: Config = {
+  dailyNew: 20,
+  dailyReviewCap: 20,
   wordsPerTarget: 110,
   targetsPerNoteMax: 40,
   candidatesPerTarget: 3,
@@ -257,6 +267,13 @@ export async function writeConfig(next: Partial<Config>): Promise<Config> {
   }
   if (!PROVIDERS.includes(merged.provider)) {
     throw new Error(`provider must be one of: ${PROVIDERS.join(', ')}`);
+  }
+  // A cap of zero would render a deck with nothing due and no way to make anything due; a
+  // fractional one would put "3.5 to review" on the home page.
+  for (const k of ['dailyNew', 'dailyReviewCap'] as const) {
+    if (!Number.isInteger(merged[k]) || merged[k] < 1) {
+      throw new Error(`${k} must be a whole number of at least 1.`);
+    }
   }
   if (merged.cardsPerTarget > merged.candidatesPerTarget) {
     throw new Error('cardsPerTarget cannot exceed candidatesPerTarget — there would be nothing to pick from.');

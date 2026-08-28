@@ -1,5 +1,4 @@
 import 'server-only';
-import { DAILY_REVIEW_CAP } from './goals';
 import { supabase } from './supabase';
 import type { Angle, CardType, DueCard, StillEndorse } from './types';
 
@@ -107,8 +106,12 @@ export async function pendingTargets(): Promise<QueueItem[]> {
  * you can drop it there. `Review` is everything you have already met at least once. Splitting on
  * `reps` rather than on a status flag means the boundary is a fact about your history with the
  * card, not a piece of workflow state that could drift out of sync.
+ *
+ * `limit` has no default on purpose. It is a day's worth — `dailyNew` or `dailyReviewCap` — and
+ * a fallback here would be a second, quieter setting that overrides the real one whenever a
+ * caller forgets to pass it.
  */
-export async function newCards(limit = 40): Promise<DueCard[]> {
+export async function newCards(limit: number): Promise<DueCard[]> {
   const db = supabase();
   const { data, error } = await db
     .from('due_cards')
@@ -120,7 +123,7 @@ export async function newCards(limit = 40): Promise<DueCard[]> {
   return (data ?? []) as unknown as DueCard[];
 }
 
-export async function dueCards(limit = 60): Promise<DueCard[]> {
+export async function dueCards(limit: number): Promise<DueCard[]> {
   const db = supabase();
   const { data, error } = await db
     .from('due_cards')
@@ -318,6 +321,14 @@ export interface Activity {
   daysDone: number;
   todayReviews: number;
   todayLearned: number;
+  /**
+   * The `dailyReviewCap` this was computed with, echoed back for the graph.
+   *
+   * The graph is a client component and buckets its colours against the same target, but the
+   * config lives behind `node:fs`. Carrying it on the payload beats either importing the store
+   * into the browser or letting the two drift.
+   */
+  reviewTarget: number;
 }
 
 /**
@@ -327,7 +338,7 @@ export interface Activity {
  * make showing up cheap: a bar set at "did my full quota" turns one busy evening into a broken
  * chain and, in practice, into an abandoned deck.
  */
-export async function activity(): Promise<Activity> {
+export async function activity(reviewCap: number): Promise<Activity> {
   const db = supabase();
 
   const since = new Date();
@@ -422,11 +433,12 @@ export async function activity(): Promise<Activity> {
       date: key,
       ...e,
       owed,
-      // Forty is a full sitting. Past that the day is discharged whatever the backlog says —
-      // otherwise digging out of a pile marks every day of the dig as a failure. Learning new
-      // cards doesn't count towards it: meeting ninety new cards while ignoring what was due is
-      // the opposite of keeping up, however much work it was.
-      met: owed === 0 || e.reviews - e.learned >= DAILY_REVIEW_CAP,
+      // A full sitting discharges the day whatever the backlog says — otherwise digging out of
+      // a pile marks every day of the dig as a failure. Learning new cards doesn't count towards
+      // it: meeting ninety new cards while ignoring what was due is the opposite of keeping up,
+      // however much work it was. Lowering the cap can therefore mark *past* days as met that
+      // weren't before, which is the honest reading — the bar for a day's work moved.
+      met: owed === 0 || e.reviews - e.learned >= reviewCap,
     });
     cursor.setDate(cursor.getDate() + 1);
   }
@@ -478,6 +490,7 @@ export async function activity(): Promise<Activity> {
     daysDone: everyDay.size,
     todayReviews: last?.reviews ?? 0,
     todayLearned: last?.learned ?? 0,
+    reviewTarget: reviewCap,
   };
 }
 

@@ -3,6 +3,7 @@ import { ActivityGraph } from '@/components/activity-graph';
 import { HomeSync } from '@/components/home-sync';
 import { vaultStatus } from '@/lib/environment';
 import { dayPlan } from '@/lib/goals';
+import { readConfig } from '@/lib/prompt-store';
 import { activity, counts } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
@@ -57,13 +58,21 @@ function Goal({
 }
 
 export default async function Home() {
-  const [c, a, vault] = await Promise.all([counts(), activity(), vaultStatus()]);
+  // Both daily limits are settings, so nothing on this page can be computed until they are known.
+  const config = await readConfig();
+  const [c, a, vault] = await Promise.all([
+    counts(),
+    activity(config.dailyReviewCap),
+    vaultStatus(),
+  ]);
 
   const plan = dayPlan({
     newAvailable: c.newCards,
     dueNow: c.dueNow,
     learnedToday: a.todayLearned,
     reviewedToday: a.todayReviews - a.todayLearned,
+    dailyNew: config.dailyNew,
+    dailyReviewCap: config.dailyReviewCap,
   });
 
   return (
@@ -102,7 +111,9 @@ export default async function Home() {
             </div>
 
             {/* Stopping here is the recommendation, not a rule. Carrying on is one click away —
-                just labelled honestly, since tomorrow's session is where it comes from. */}
+                just labelled honestly, since tomorrow's session is where it comes from. The
+                counts are what the next sitting would actually hand you, not what is left in the
+                deck: a session is capped, and "review 140 more" that produces twenty is a lie. */}
             {(c.dueNow > 0 || c.newCards > 0) && (
               <div className="mt-6 flex flex-wrap items-baseline gap-x-6 gap-y-2">
                 <span className="text-xs text-ink-4">Want to keep going?</span>
@@ -111,12 +122,14 @@ export default async function Home() {
                     href="/review"
                     className="text-sm text-ink-3 transition-colors hover:text-ink"
                   >
-                    Review {c.dueNow} more <span className="text-ink-4">→</span>
+                    Review {Math.min(c.dueNow, config.dailyReviewCap)} more{' '}
+                    <span className="text-ink-4">→</span>
                   </Link>
                 )}
                 {c.newCards > 0 && (
                   <Link href="/new" className="text-sm text-ink-3 transition-colors hover:text-ink">
-                    Learn {c.newCards} more <span className="text-ink-4">→</span>
+                    Learn {Math.min(c.newCards, config.dailyNew)} more{' '}
+                    <span className="text-ink-4">→</span>
                   </Link>
                 )}
                 <span className="text-[0.6875rem] text-ink-4">

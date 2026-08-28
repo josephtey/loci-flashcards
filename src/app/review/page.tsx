@@ -7,13 +7,17 @@ import { Review } from './review-client';
 export const dynamic = 'force-dynamic';
 
 export default async function ReviewPage() {
-  // Asked on every load rather than cached: Ollama is a process on a laptop, and whether it was
-  // running when the last page rendered says nothing about whether it is running now.
-  const [cards, grader, explainer, config] = await Promise.all([
-    dueCards(),
+  // Read first because it sets the size of the session: a sitting is a day's cap worth of cards,
+  // not everything that happens to be due. Coming back for a second round is a choice made on the
+  // home page, where it is labelled honestly, rather than the default.
+  const config = await readConfig();
+
+  // Both statuses are asked on every load rather than cached — whether the provider answered when
+  // the last page rendered says nothing about whether it will answer now.
+  const [cards, grader, explainer] = await Promise.all([
+    dueCards(config.dailyReviewCap),
     graderStatus(),
     explainerStatus(),
-    readConfig(),
   ]);
 
   if (!cards.length) {

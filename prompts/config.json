@@ -1,4 +1,6 @@
 {
+  "dailyNew": 20,
+  "dailyReviewCap": 20,
   "wordsPerTarget": 110,
   "targetsPerNoteMax": 40,
   "candidatesPerTarget": 3,

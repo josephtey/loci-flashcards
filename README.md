@@ -81,18 +81,24 @@ prompt you keep forgetting is a broken prompt, not a broken memory.
 The home page leads with today, not the deck total — a total only goes up when you write more, so
 it reads as debt however much work you do.
 
-**20 new cards a day, 50 reviews.** A card needs roughly eight to ten reviews to reach multi-year
+**20 new cards a day, 20 reviews.** A card needs roughly eight to ten reviews to reach multi-year
 stability, so steady-state review load is about 8–10× the daily new-card rate, permanently — which
-makes 20 an ambitious intake against a 50-review ceiling. The trade is deliberate: the deck is fed
+makes 20 an ambitious intake against a 20-review ceiling. The trade is deliberate: the deck is fed
 by one person's writing, so clearing the queue after a sync matters more than holding the two
-numbers in balance. The 50 is a cap rather than a quota — on the day you return to a backlog it
-time-boxes the dig instead of asking for three hundred cards. Both live in `src/lib/goals.ts`; if
-due counts climb week over week, lower the intake.
+numbers in balance. The review number is a cap rather than a quota — on the day you return to a
+backlog it time-boxes the dig instead of asking for three hundred cards. It also sizes the session
+itself, so a sitting is a day's worth of cards and carrying on is a second, deliberate trip through
+the home page. Both are `dailyNew` and `dailyReviewCap` in the config, tunable under **Tuning** on
+/methodology; if due counts climb week over week, lower the intake.
 
-The streak counts **days that ended with nothing owed**, not days with any activity. It's
-reconstructed from history — each review carries the card's prior due date, so every stretch where
-a card sat due-and-unreviewed is derivable. New cards don't count towards it: they're elastic, and
-a day spent not learning something new costs nothing you already had.
+The headline on the activity graph is **days done** — every day you reviewed anything, all-time,
+and a number that only ever goes up. The streak beside it counts consecutive days with reviews. It
+used to count days that ended with nothing owed, which is a better description of keeping up and
+unusable as a number: one card left overdue marks every day since as a failure, so the past changed
+on the strength of the present. What's owed is still reconstructed from history — each review
+carries the card's prior due date — and still shown per-day in the graph, where a day that owed
+nothing gets an outline. New cards don't count towards it: they're elastic, and a day spent not
+learning something new costs nothing you already had.
 
 ---
 

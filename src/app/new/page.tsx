@@ -7,11 +7,12 @@ import { Review } from '../review/review-client';
 export const dynamic = 'force-dynamic';
 
 export default async function NewPage() {
-  const [cards, grader, explainer, config] = await Promise.all([
-    newCards(),
+  // Read first: it sets how many new cards a sitting hands you.
+  const config = await readConfig();
+  const [cards, grader, explainer] = await Promise.all([
+    newCards(config.dailyNew),
     graderStatus(),
     explainerStatus(),
-    readConfig(),
   ]);
 
   if (!cards.length) {
