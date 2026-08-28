@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ActivityGraph } from '@/components/activity-graph';
 import { DeckHealthLine } from '@/components/deck-health';
+import { ForgettingCurve } from '@/components/forgetting-curve';
 import { HomeSync } from '@/components/home-sync';
 import { vaultStatus } from '@/lib/environment';
 import { dayPlan } from '@/lib/goals';
@@ -174,7 +175,12 @@ export default async function Home() {
           </div>
         )}
 
-        {health && <DeckHealthLine health={health} mean={r.mean} />}
+        {health && (
+          <>
+            <DeckHealthLine health={health} mean={r.mean} />
+            <ForgettingCurve forecast={r.forecast} state={health.key} />
+          </>
+        )}
 
         {/* The whole deck, deliberately quiet: it's context, not a to-do list. */}
         <div className="mt-10 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[0.6875rem] text-ink-4">

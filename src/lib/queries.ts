@@ -314,7 +314,19 @@ export interface Recall {
   lost: number;
   /** Mean current retrievability, 0-1. */
   mean: number;
+  /**
+   * Where the deck goes from here if nothing is reviewed. One entry per day, today first.
+   *
+   * A counterfactual, and deliberately so: the whole value of it is showing what the reviews you
+   * have not done yet are for. `solid` is the share still above `SLIPPED_AT` — the number that
+   * carries the shape, since a deck learned in cohorts crosses that line in cohorts too, and the
+   * mean glides through the cliff without registering it.
+   */
+  forecast: { day: number; mean: number; solid: number }[];
 }
+
+/** Days of forecast. Long enough to show the next cohort go, short enough to still be a forecast. */
+export const FORECAST_DAYS = 30;
 
 /**
  * What the deck currently remembers.
@@ -337,18 +349,35 @@ export async function recall(now = new Date()): Promise<Recall> {
     .gt('reps', 0);
   if (error) throw new Error(error.message);
 
-  const rs: number[] = [];
-  for (const row of data ?? []) {
-    if (!(Number(row.scheduled_days) >= 1)) continue;
-    const r = retrievability(row as unknown as Partial<CardStateRow>, now);
-    if (r !== null) rs.push(r);
+  const rows = (data ?? []).filter(
+    (row) => Number(row.scheduled_days) >= 1,
+  ) as unknown as Partial<CardStateRow>[];
+
+  // One pass per day, today included. Today's column is what the status is built from, so the
+  // reading beside the chart and the chart's first point are the same arithmetic rather than two
+  // that ought to agree.
+  const forecast: Recall['forecast'] = [];
+  let today: number[] = [];
+  for (let day = 0; day <= FORECAST_DAYS; day++) {
+    const rs: number[] = [];
+    for (const row of rows) {
+      const r = retrievability(row, day, now);
+      if (r !== null) rs.push(r);
+    }
+    if (day === 0) today = rs;
+    forecast.push({
+      day,
+      mean: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 1,
+      solid: rs.length ? rs.filter((r) => r >= SLIPPED_AT).length / rs.length : 1,
+    });
   }
 
   return {
-    scheduled: rs.length,
-    slipped: rs.filter((r) => r < SLIPPED_AT).length,
-    lost: rs.filter((r) => r < LOST_AT).length,
-    mean: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 1,
+    scheduled: today.length,
+    slipped: today.filter((r) => r < SLIPPED_AT).length,
+    lost: today.filter((r) => r < LOST_AT).length,
+    mean: forecast[0].mean,
+    forecast,
   };
 }
 

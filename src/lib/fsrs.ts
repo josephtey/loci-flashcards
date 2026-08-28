@@ -1,4 +1,12 @@
-import { fsrs, generatorParameters, createEmptyCard, State, type Card, type Grade } from 'ts-fsrs';
+import {
+  createEmptyCard,
+  forgetting_curve,
+  fsrs,
+  generatorParameters,
+  State,
+  type Card,
+  type Grade,
+} from 'ts-fsrs';
 import type { CardStateRow, RatingValue } from './types';
 
 /**
@@ -73,7 +81,8 @@ export function newCardState(cardId: string): Omit<CardStateRow, 'skip_count' | 
 }
 
 /**
- * The odds you'd still recall this card right now, 0–1.
+ * The odds you'd still recall this card `daysAhead` from now, 0-1, if it is not reviewed before
+ * then. Pass 0 for right now.
  *
  * FSRS's whole model is this curve: memory decays as a function of time since the last review
  * against the stability that review earned. It is the only honest way to ask "how is the deck
@@ -81,11 +90,21 @@ export function newCardState(cardId: string): Omit<CardStateRow, 'skip_count' | 
  * memory. A card with a 44-day interval that is five days late is at 97%; a card with a one-day
  * interval that is five days late is at 65%. Both read as "5 days overdue".
  *
+ * `forgetting_curve` rather than the scheduler's own `get_retrievability` because that one
+ * rounds elapsed time to whole days, which is right for scheduling and wrong for a chart — a
+ * curve drawn from it comes out as a staircase, and its first point disagrees with the reading
+ * beside it by a fraction of a percent.
+ *
  * Returns null for a card that has never earned a stability, since there is no curve to sit on.
  */
-export function retrievability(row: Partial<CardStateRow>, now = new Date()): number | null {
+export function retrievability(
+  row: Partial<CardStateRow>,
+  daysAhead = 0,
+  now = new Date(),
+): number | null {
   if (row.stability == null || !row.last_review) return null;
-  return scheduler.get_retrievability(rowToCard(row), now, false);
+  const elapsed = (now.getTime() - new Date(row.last_review).getTime()) / 86_400_000;
+  return forgetting_curve(params.w, Math.max(0, elapsed + daysAhead), row.stability);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

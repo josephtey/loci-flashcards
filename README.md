@@ -92,8 +92,9 @@ the home page. Both are `dailyNew` and `dailyReviewCap` in the config, tunable u
 /methodology; if due counts climb week over week, lower the intake.
 
 Under today's numbers is a five-step read on **deck health**: *losing ground · behind · slipping ·
-on track · ahead*, coloured with the memory-horizon ramp (`--mem-fresh` through `--mem-long`) since
-that palette already means "how well established is this memory". It is deliberately not built on how many cards are overdue, because a queue is
+on track · ahead*, on a red-to-green severity ramp (`--sev-1` through `--sev-5`). Deliberately not
+the memory-horizon palette: there, warm means a memory is young, and a young memory is not bad
+news. It is deliberately not built on how many cards are overdue, because a queue is
 not a memory. At the time of writing this deck carried 72 overdue cards, the oldest twelve days
 late, and its mean recall was 90% — exactly the retention it targets. An overdue count would have
 shouted at a deck that was fine.
@@ -105,6 +106,14 @@ each card's own interval into account. A card on a 44-day interval that is five 
 signal, in sittings rather than cards, because a backlog you can't clear becomes decay soon enough
 even when nothing has decayed yet. Only actual forgetting reaches the worst state — a deep queue
 with intact memory tops out at *behind*, since by the model's own account it is just work.
+
+Beneath it is the deck's **forgetting curve** for the next thirty days, assuming you review
+nothing — a counterfactual whose job is to price the reviews you haven't done. Two lines, because
+either alone misleads. Mean recall is the textbook curve and it is a flatterer: on this deck it
+glides from 91% to 81% and never crosses the 80% line at all. The share of cards still above that
+line falls off a cliff the mean glides straight through — 100% until day 13, then 56% by day 14 —
+because a deck fed by one person's writing is learned in cohorts, and a cohort sharing a stability
+of eight days crosses the line on the same afternoon.
 
 The headline on the activity graph is **days done** — every day you reviewed anything, all-time,
 and a number that only ever goes up. The streak beside it counts consecutive days with reviews. It

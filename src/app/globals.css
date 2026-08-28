@@ -23,6 +23,16 @@
   --mem-medium: #5f9ea0;
   --mem-long: #6e9e6e;
   --mem-dropped: #3a3a3a;
+
+  /* Severity, red through green, for the deck-health status only. The memory ramp above is about
+     how long a memory has been held; this one is about how bad the news is, and they disagree —
+     a card can be freshly learned (warm) and perfectly healthy. Same muted register as the rest:
+     a true red on black is a fire alarm, and this page is read at 11pm. */
+  --sev-1: #c2554e;
+  --sev-2: #c97b4e;
+  --sev-3: #bda04e;
+  --sev-4: #8fa25c;
+  --sev-5: #6e9e6e;
 }
 
 @theme inline {
@@ -39,6 +49,11 @@
   --color-mem-medium: var(--mem-medium);
   --color-mem-long: var(--mem-long);
   --color-mem-dropped: var(--mem-dropped);
+  --color-sev-1: var(--sev-1);
+  --color-sev-2: var(--sev-2);
+  --color-sev-3: var(--sev-3);
+  --color-sev-4: var(--sev-4);
+  --color-sev-5: var(--sev-5);
   --breakpoint-xs: 26rem;
   --font-sans: var(--font-sans-stack);
   --font-mono: var(--font-mono-stack);
