@@ -91,6 +91,20 @@ itself, so a sitting is a day's worth of cards and carrying on is a second, deli
 the home page. Both are `dailyNew` and `dailyReviewCap` in the config, tunable under **Tuning** on
 /methodology; if due counts climb week over week, lower the intake.
 
+Under today's numbers is a five-step read on **deck health**: *losing ground · behind · slipping ·
+on track · ahead*. It is deliberately not built on how many cards are overdue, because a queue is
+not a memory. At the time of writing this deck carried 72 overdue cards, the oldest twelve days
+late, and its mean recall was 90% — exactly the retention it targets. An overdue count would have
+shouted at a deck that was fine.
+
+So the primary signal is FSRS retrievability: how many memories have measurably decayed, taking
+each card's own interval into account. A card on a 44-day interval that is five days late sits at
+97%; a card on a one-day interval five days late sits at 65%. Both read as "5 days overdue". Below
+80% a card has slipped, below 60% it comes back close to new. The depth of the queue is the second
+signal, in sittings rather than cards, because a backlog you can't clear becomes decay soon enough
+even when nothing has decayed yet. Only actual forgetting reaches the worst state — a deep queue
+with intact memory tops out at *behind*, since by the model's own account it is just work.
+
 The headline on the activity graph is **days done** — every day you reviewed anything, all-time,
 and a number that only ever goes up. The streak beside it counts consecutive days with reviews. It
 used to count days that ended with nothing owed, which is a better description of keeping up and

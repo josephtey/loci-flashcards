@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import { ActivityGraph } from '@/components/activity-graph';
+import { DeckHealthLine } from '@/components/deck-health';
 import { HomeSync } from '@/components/home-sync';
 import { vaultStatus } from '@/lib/environment';
 import { dayPlan } from '@/lib/goals';
+import { deckHealth } from '@/lib/health';
 import { readConfig } from '@/lib/prompt-store';
-import { activity, counts } from '@/lib/queries';
+import { activity, counts, recall } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,9 +62,10 @@ function Goal({
 export default async function Home() {
   // Both daily limits are settings, so nothing on this page can be computed until they are known.
   const config = await readConfig();
-  const [c, a, vault] = await Promise.all([
+  const [c, a, r, vault] = await Promise.all([
     counts(),
     activity(config.dailyReviewCap),
+    recall(),
     vaultStatus(),
   ]);
 
@@ -73,6 +76,15 @@ export default async function Home() {
     reviewedToday: a.todayReviews - a.todayLearned,
     dailyNew: config.dailyNew,
     dailyReviewCap: config.dailyReviewCap,
+  });
+
+  const health = deckHealth({
+    scheduled: r.scheduled,
+    slipped: r.slipped,
+    lost: r.lost,
+    dueNow: c.dueNow,
+    dailyReviewCap: config.dailyReviewCap,
+    activeLast7: a.days.slice(-7).filter((d) => d.reviews > 0).length,
   });
 
   return (
@@ -161,6 +173,8 @@ export default async function Home() {
             </div>
           </div>
         )}
+
+        {health && <DeckHealthLine health={health} mean={r.mean} />}
 
         {/* The whole deck, deliberately quiet: it's context, not a to-do list. */}
         <div className="mt-10 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-[0.6875rem] text-ink-4">

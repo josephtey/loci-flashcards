@@ -1,6 +1,8 @@
 import 'server-only';
+import { retrievability } from './fsrs';
+import { LOST_AT, SLIPPED_AT } from './health';
 import { supabase } from './supabase';
-import type { Angle, CardType, DueCard, StillEndorse } from './types';
+import type { Angle, CardStateRow, CardType, DueCard, StillEndorse } from './types';
 
 export interface QueueCard {
   id: string;
@@ -297,6 +299,57 @@ export async function browseByNote(): Promise<BrowseNote[]> {
           ]
         : [],
     );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Recall
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface Recall {
+  /** Active cards on a real (non-learning) schedule. The denominator for everything below. */
+  scheduled: number;
+  /** Of those, how many have decayed past `SLIPPED_AT`. */
+  slipped: number;
+  /** Of those, how many have decayed past `LOST_AT`. */
+  lost: number;
+  /** Mean current retrievability, 0-1. */
+  mean: number;
+}
+
+/**
+ * What the deck currently remembers.
+ *
+ * Every other number on the home page describes a queue — due today, due in total, days late.
+ * This one describes the memory, which is the thing the queue exists to protect, and the two
+ * come apart more often than you would think: a card on a 44-day interval that is five days late
+ * is at 97%, and a card on a one-day interval five days late is at 65%.
+ *
+ * Cards still in learning steps are excluded, the same exclusion the debt reconstruction makes.
+ * FSRS brings a card you just met back in ten minutes, and counting that as a memory at risk
+ * would mean every productive evening ended in a warning.
+ */
+export async function recall(now = new Date()): Promise<Recall> {
+  const db = supabase();
+  const { data, error } = await db
+    .from('card_states')
+    .select('due, stability, difficulty, last_review, state, elapsed_days, scheduled_days, reps, lapses, learning_steps, cards!inner(status)')
+    .eq('cards.status', 'active')
+    .gt('reps', 0);
+  if (error) throw new Error(error.message);
+
+  const rs: number[] = [];
+  for (const row of data ?? []) {
+    if (!(Number(row.scheduled_days) >= 1)) continue;
+    const r = retrievability(row as unknown as Partial<CardStateRow>, now);
+    if (r !== null) rs.push(r);
+  }
+
+  return {
+    scheduled: rs.length,
+    slipped: rs.filter((r) => r < SLIPPED_AT).length,
+    lost: rs.filter((r) => r < LOST_AT).length,
+    mean: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 1,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

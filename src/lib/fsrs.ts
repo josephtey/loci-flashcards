@@ -72,6 +72,22 @@ export function newCardState(cardId: string): Omit<CardStateRow, 'skip_count' | 
   return cardToRow(cardId, createEmptyCard(new Date()));
 }
 
+/**
+ * The odds you'd still recall this card right now, 0–1.
+ *
+ * FSRS's whole model is this curve: memory decays as a function of time since the last review
+ * against the stability that review earned. It is the only honest way to ask "how is the deck
+ * doing" — the counts you can see (how many are due, how many days late) describe a queue, not a
+ * memory. A card with a 44-day interval that is five days late is at 97%; a card with a one-day
+ * interval that is five days late is at 65%. Both read as "5 days overdue".
+ *
+ * Returns null for a card that has never earned a stability, since there is no curve to sit on.
+ */
+export function retrievability(row: Partial<CardStateRow>, now = new Date()): number | null {
+  if (row.stability == null || !row.last_review) return null;
+  return scheduler.get_retrievability(rowToCard(row), now, false);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Grading
 // ─────────────────────────────────────────────────────────────────────────────
