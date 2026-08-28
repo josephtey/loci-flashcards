@@ -92,7 +92,8 @@ the home page. Both are `dailyNew` and `dailyReviewCap` in the config, tunable u
 /methodology; if due counts climb week over week, lower the intake.
 
 Under today's numbers is a five-step read on **deck health**: *losing ground · behind · slipping ·
-on track · ahead*. It is deliberately not built on how many cards are overdue, because a queue is
+on track · ahead*, coloured with the memory-horizon ramp (`--mem-fresh` through `--mem-long`) since
+that palette already means "how well established is this memory". It is deliberately not built on how many cards are overdue, because a queue is
 not a memory. At the time of writing this deck carried 72 overdue cards, the oldest twelve days
 late, and its mean recall was 90% — exactly the retention it targets. An overdue count would have
 shouted at a deck that was fine.
