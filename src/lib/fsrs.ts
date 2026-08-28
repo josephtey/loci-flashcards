@@ -107,6 +107,27 @@ export function retrievability(
   return forgetting_curve(params.w, Math.max(0, elapsed + daysAhead), row.stability);
 }
 
+/**
+ * The forgetting curve every card shares.
+ *
+ * FSRS's recall probability depends on elapsed time only through `t / S` — so there is not one
+ * curve per card, there is one curve and each card is somewhere along it. `x = 1` is by
+ * definition the point where recall has fallen to 90%, because that is what stability means.
+ *
+ * Computed at stability 1 so `elapsed_days` reads as `x` directly. Sent to the browser once and
+ * reused for every card, which is exact rather than a convenience: a card's own curve in days is
+ * this curve with the x-axis multiplied by its stability.
+ *
+ * The default horizon runs to x = 8, which is where recall reaches roughly 60% — the point below
+ * which a card is treated as gone. Drawing further would spend the plot on a tail nothing acts on.
+ */
+export function universalCurve(maxX = 8, steps = 64): { x: number; r: number }[] {
+  return Array.from({ length: steps + 1 }, (_, i) => {
+    const x = (i / steps) * maxX;
+    return { x, r: forgetting_curve(params.w, x, 1) };
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Grading
 // ─────────────────────────────────────────────────────────────────────────────

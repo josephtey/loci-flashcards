@@ -107,13 +107,26 @@ signal, in sittings rather than cards, because a backlog you can't clear becomes
 even when nothing has decayed yet. Only actual forgetting reaches the worst state — a deep queue
 with intact memory tops out at *behind*, since by the model's own account it is just work.
 
-Beneath it is the deck's **forgetting curve** for the next thirty days, assuming you review
-nothing — a counterfactual whose job is to price the reviews you haven't done. Two lines, because
-either alone misleads. Mean recall is the textbook curve and it is a flatterer: on this deck it
-glides from 91% to 81% and never crosses the 80% line at all. The share of cards still above that
-line falls off a cliff the mean glides straight through — 100% until day 13, then 56% by day 14 —
-because a deck fed by one person's writing is learned in cohorts, and a cohort sharing a stability
-of eight days crosses the line on the same afternoon.
+Beneath it is the **memory map**: the forgetting curve, with every card you have actually learned
+sitting on it. Never-learned cards are left out — a card you have not met has no stability, so
+there is no curve it sits on and no recall to estimate; including it would mean inventing a
+position for a memory that does not exist.
+
+There is one curve, not one per card. FSRS recall depends on elapsed time only through `t / S`, so
+every card is somewhere along the same shape, and `x = 1` is by definition where recall has fallen
+to 90% — that is what stability means. Left is just-reviewed, right is on the way out. Dots are
+coloured by band: *probably gone* (under 60%), *slipping* (60–80%), **on the verge** (80–90%),
+*holding* (90–95%), *solid* (95%+).
+
+The middle of the curve is the point of the whole thing. A card is worth reviewing when it is on
+the verge of being forgotten: recall it at 99% and the review costs effort and buys almost nothing,
+recall it at 40% and you are learning it again from scratch. Point at any dot for the card, its
+recall, how long it holds and when it is due.
+
+Cards fan out around their position rather than stacking on it. At the time of writing 48 sat
+within a percentage point of each other, and drawn strictly on the line they would have been one
+dot with 47 hidden underneath. The spread is mostly vertical, which costs nothing; sideways it
+shifts a card by about half a percent of recall on the densest cluster.
 
 The headline on the activity graph is **days done** — every day you reviewed anything, all-time,
 and a number that only ever goes up. The streak beside it counts consecutive days with reviews. It

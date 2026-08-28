@@ -1,8 +1,12 @@
 import 'server-only';
-import { retrievability } from './fsrs';
+import { retrievability, universalCurve } from './fsrs';
+import { askedOf } from './grading';
 import { LOST_AT, SLIPPED_AT } from './health';
 import { supabase } from './supabase';
-import type { Angle, CardStateRow, CardType, DueCard, StillEndorse } from './types';
+import type { Angle, CardRow, CardStateRow, CardType, DueCard, StillEndorse } from './types';
+
+/** The fields `askedOf` needs to reproduce what the review screen showed. */
+type CardFace = Pick<CardRow, 'type' | 'front' | 'back' | 'cloze_text'>;
 
 export interface QueueCard {
   id: string;
@@ -302,82 +306,91 @@ export async function browseByNote(): Promise<BrowseNote[]> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Recall
+// Memory
 // ─────────────────────────────────────────────────────────────────────────────
 
-export interface Recall {
-  /** Active cards on a real (non-learning) schedule. The denominator for everything below. */
-  scheduled: number;
-  /** Of those, how many have decayed past `SLIPPED_AT`. */
-  slipped: number;
-  /** Of those, how many have decayed past `LOST_AT`. */
-  lost: number;
-  /** Mean current retrievability, 0-1. */
-  mean: number;
-  /**
-   * Where the deck goes from here if nothing is reviewed. One entry per day, today first.
-   *
-   * A counterfactual, and deliberately so: the whole value of it is showing what the reviews you
-   * have not done yet are for. `solid` is the share still above `SLIPPED_AT` — the number that
-   * carries the shape, since a deck learned in cohorts crosses that line in cohorts too, and the
-   * mean glides through the cliff without registering it.
-   */
-  forecast: { day: number; mean: number; solid: number }[];
+/** One learned card, and where it currently sits on the forgetting curve. */
+export interface MemoryCard {
+  id: string;
+  /** What the card asks, already resolved for cloze so it matches what you were shown. */
+  asks: string;
+  note: string | null;
+  /** Odds you'd recall it right now, 0-1. */
+  r: number;
+  /** Its position on the universal curve: elapsed time in units of its own stability. */
+  x: number;
+  /** Days for recall to fall to 90%, which is what stability means. */
+  stability: number;
+  /** Negative means overdue. */
+  dueInDays: number;
 }
 
-/** Days of forecast. Long enough to show the next cohort go, short enough to still be a forecast. */
-export const FORECAST_DAYS = 30;
+export interface Memory {
+  /** Learned cards only, most at risk first. */
+  cards: MemoryCard[];
+  /** Of those, on a real (non-learning) schedule — the denominator the status is judged on. */
+  scheduled: number;
+  slipped: number;
+  lost: number;
+  mean: number;
+  /** The one curve they all sit on, in units of stability. */
+  curve: { x: number; r: number }[];
+}
 
 /**
- * What the deck currently remembers.
+ * Every memory you actually have, and how strong each one is.
  *
- * Every other number on the home page describes a queue — due today, due in total, days late.
- * This one describes the memory, which is the thing the queue exists to protect, and the two
- * come apart more often than you would think: a card on a 44-day interval that is five days late
- * is at 97%, and a card on a one-day interval five days late is at 65%.
+ * Never-learned cards are excluded on purpose and not merely for tidiness: a card you have not
+ * met has no stability, so there is no curve it sits on and no recall to estimate. Including
+ * them would mean inventing a position for a memory that does not exist.
  *
- * Cards still in learning steps are excluded, the same exclusion the debt reconstruction makes.
- * FSRS brings a card you just met back in ten minutes, and counting that as a memory at risk
- * would mean every productive evening ended in a warning.
+ * Cards mid-learning-step *are* included — you have met them, so they are memories — but they are
+ * left out of `scheduled` and the counts built on it, matching the debt reconstruction, which
+ * treats a card due back in ten minutes as part of this evening rather than as a debt.
  */
-export async function recall(now = new Date()): Promise<Recall> {
+export async function memory(now = new Date()): Promise<Memory> {
   const db = supabase();
   const { data, error } = await db
     .from('card_states')
-    .select('due, stability, difficulty, last_review, state, elapsed_days, scheduled_days, reps, lapses, learning_steps, cards!inner(status)')
+    .select(
+      'due, stability, difficulty, last_review, state, elapsed_days, scheduled_days, reps, lapses, learning_steps, cards!inner(id, status, type, front, back, cloze_text, notes(title))',
+    )
     .eq('cards.status', 'active')
     .gt('reps', 0);
   if (error) throw new Error(error.message);
 
-  const rows = (data ?? []).filter(
-    (row) => Number(row.scheduled_days) >= 1,
-  ) as unknown as Partial<CardStateRow>[];
+  const cards: MemoryCard[] = [];
+  const scheduledRs: number[] = [];
 
-  // One pass per day, today included. Today's column is what the status is built from, so the
-  // reading beside the chart and the chart's first point are the same arithmetic rather than two
-  // that ought to agree.
-  const forecast: Recall['forecast'] = [];
-  let today: number[] = [];
-  for (let day = 0; day <= FORECAST_DAYS; day++) {
-    const rs: number[] = [];
-    for (const row of rows) {
-      const r = retrievability(row, day, now);
-      if (r !== null) rs.push(r);
-    }
-    if (day === 0) today = rs;
-    forecast.push({
-      day,
-      mean: rs.length ? rs.reduce((a, b) => a + b, 0) / rs.length : 1,
-      solid: rs.length ? rs.filter((r) => r >= SLIPPED_AT).length / rs.length : 1,
+  for (const row of data ?? []) {
+    const state = row as unknown as Partial<CardStateRow>;
+    const r = retrievability(state, 0, now);
+    if (r === null || !state.stability || !state.last_review) continue;
+
+    const c = (row as unknown as { cards: CardFace & { id: string; notes: { title: string } | null } })
+      .cards;
+    cards.push({
+      id: c.id,
+      asks: askedOf(c).question,
+      note: c.notes?.title ?? null,
+      r,
+      x: (now.getTime() - new Date(state.last_review).getTime()) / 86_400_000 / state.stability,
+      stability: state.stability,
+      dueInDays: (new Date(state.due!).getTime() - now.getTime()) / 86_400_000,
     });
+
+    if (Number(state.scheduled_days) >= 1) scheduledRs.push(r);
   }
 
+  cards.sort((a, b) => a.r - b.r);
+
   return {
-    scheduled: today.length,
-    slipped: today.filter((r) => r < SLIPPED_AT).length,
-    lost: today.filter((r) => r < LOST_AT).length,
-    mean: forecast[0].mean,
-    forecast,
+    cards,
+    scheduled: scheduledRs.length,
+    slipped: scheduledRs.filter((v) => v < SLIPPED_AT).length,
+    lost: scheduledRs.filter((v) => v < LOST_AT).length,
+    mean: scheduledRs.length ? scheduledRs.reduce((a, b) => a + b, 0) / scheduledRs.length : 1,
+    curve: universalCurve(),
   };
 }
 

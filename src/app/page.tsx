@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { ActivityGraph } from '@/components/activity-graph';
 import { DeckHealthLine } from '@/components/deck-health';
-import { ForgettingCurve } from '@/components/forgetting-curve';
 import { HomeSync } from '@/components/home-sync';
+import { MemoryMap } from '@/components/memory-map';
 import { vaultStatus } from '@/lib/environment';
 import { dayPlan } from '@/lib/goals';
 import { deckHealth } from '@/lib/health';
 import { readConfig } from '@/lib/prompt-store';
-import { activity, counts, recall } from '@/lib/queries';
+import { activity, counts, memory } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,10 +63,10 @@ function Goal({
 export default async function Home() {
   // Both daily limits are settings, so nothing on this page can be computed until they are known.
   const config = await readConfig();
-  const [c, a, r, vault] = await Promise.all([
+  const [c, a, m, vault] = await Promise.all([
     counts(),
     activity(config.dailyReviewCap),
-    recall(),
+    memory(),
     vaultStatus(),
   ]);
 
@@ -80,9 +80,9 @@ export default async function Home() {
   });
 
   const health = deckHealth({
-    scheduled: r.scheduled,
-    slipped: r.slipped,
-    lost: r.lost,
+    scheduled: m.scheduled,
+    slipped: m.slipped,
+    lost: m.lost,
     dueNow: c.dueNow,
     dailyReviewCap: config.dailyReviewCap,
     activeLast7: a.days.slice(-7).filter((d) => d.reviews > 0).length,
@@ -177,8 +177,8 @@ export default async function Home() {
 
         {health && (
           <>
-            <DeckHealthLine health={health} mean={r.mean} />
-            <ForgettingCurve forecast={r.forecast} state={health.key} />
+            <DeckHealthLine health={health} mean={m.mean} />
+            <MemoryMap memory={m} />
           </>
         )}
 

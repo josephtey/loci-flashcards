@@ -30,6 +30,30 @@ export const LOST_AT = 0.6;
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
+/**
+ * The five states a single memory can be in, worst first.
+ *
+ * The boundaries are the ones the rest of the system already uses: 90% is the retention the
+ * scheduler aims for at the due date, 80% is `SLIPPED_AT`, 60% is `LOST_AT`. The band that
+ * matters is 80-90% — a card there is on the verge, which is exactly when reviewing it is worth
+ * most. Recall it too early and the review is nearly free of effort and buys nearly nothing.
+ *
+ * They borrow the deck-health severity keys so there is one colour ramp in the app, not two.
+ */
+export const BANDS = [
+  { key: 'gone', label: 'probably gone', sev: 'losing', from: 0, to: LOST_AT },
+  { key: 'slipping', label: 'slipping', sev: 'behind', from: LOST_AT, to: SLIPPED_AT },
+  { key: 'verge', label: 'on the verge', sev: 'slipping', from: SLIPPED_AT, to: 0.9 },
+  { key: 'holding', label: 'holding', sev: 'ontrack', from: 0.9, to: 0.95 },
+  { key: 'solid', label: 'solid', sev: 'ahead', from: 0.95, to: 1.01 },
+] as const;
+
+export type BandKey = (typeof BANDS)[number]['key'];
+
+export function bandOf(r: number): (typeof BANDS)[number] {
+  return BANDS.find((b) => r < b.to) ?? BANDS[BANDS.length - 1];
+}
+
 export type HealthKey = 'losing' | 'behind' | 'slipping' | 'ontrack' | 'ahead';
 
 export interface DeckHealth {
