@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ActivityGraph } from '@/components/activity-graph';
 import { DeckHealthLine } from '@/components/deck-health';
+import { DeckPicker } from '@/components/deck-picker';
 import { HomeSync } from '@/components/home-sync';
 import { RefreshOnResume } from '@/components/refresh-on-resume';
 import { MemoryMap } from '@/components/memory-map';
@@ -8,7 +9,7 @@ import { vaultStatus } from '@/lib/environment';
 import { dayPlan } from '@/lib/goals';
 import { deckHealth } from '@/lib/health';
 import { readConfig } from '@/lib/prompt-store';
-import { activity, counts, memory } from '@/lib/queries';
+import { activity, counts, deckCounts, memory } from '@/lib/queries';
 
 export const dynamic = 'force-dynamic';
 
@@ -64,11 +65,12 @@ function Goal({
 export default async function Home() {
   // Both daily limits are settings, so nothing on this page can be computed until they are known.
   const config = await readConfig();
-  const [c, a, m, vault] = await Promise.all([
+  const [c, a, m, vault, decks] = await Promise.all([
     counts(),
     activity(config.dailyReviewCap),
     memory(),
     vaultStatus(),
+    deckCounts(),
   ]);
 
   const plan = dayPlan({
@@ -179,6 +181,13 @@ export default async function Home() {
             </div>
           </div>
         )}
+
+        {/* The plan above draws from the whole deck. This is how you overrule it for a sitting. */}
+        <DeckPicker
+          decks={decks}
+          dailyNew={config.dailyNew}
+          dailyReviewCap={config.dailyReviewCap}
+        />
 
         {health && (
           <>
