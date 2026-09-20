@@ -116,29 +116,59 @@ export async function pendingTargets(): Promise<QueueItem[]> {
  * `limit` has no default on purpose. It is a day's worth — `dailyNew` or `dailyReviewCap` — and
  * a fallback here would be a second, quieter setting that overrides the real one whenever a
  * caller forgets to pass it.
+ *
+ * `deck` narrows a sitting to one deck. The limit still applies: picking a deck changes which
+ * cards a day's worth is drawn from, not how many there are.
  */
-export async function newCards(limit: number): Promise<DueCard[]> {
+export async function newCards(limit: number, deck?: string): Promise<DueCard[]> {
   const db = supabase();
-  const { data, error } = await db
-    .from('due_cards')
-    .select('*')
-    .eq('reps', 0)
-    .order('created_at', { ascending: true })
-    .limit(limit);
+  let q = db.from('due_cards').select('*').eq('reps', 0);
+  if (deck) q = q.eq('deck', deck);
+  const { data, error } = await q.order('created_at', { ascending: true }).limit(limit);
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as DueCard[];
 }
 
-export async function dueCards(limit: number): Promise<DueCard[]> {
+export async function dueCards(limit: number, deck?: string): Promise<DueCard[]> {
   const db = supabase();
-  const { data, error } = await db
-    .from('due_cards')
-    .select('*')
-    .gt('reps', 0)
-    .order('due', { ascending: true })
-    .limit(limit);
+  let q = db.from('due_cards').select('*').gt('reps', 0);
+  if (deck) q = q.eq('deck', deck);
+  const { data, error } = await q.order('due', { ascending: true }).limit(limit);
   if (error) throw new Error(error.message);
   return (data ?? []) as unknown as DueCard[];
+}
+
+/** What one deck is holding for you right now. */
+export interface DeckCounts {
+  /** The `deck` column: the vault folder a card came from, or `hand-written`. */
+  deck: string;
+  newCards: number;
+  dueNow: number;
+}
+
+/**
+ * The same two numbers as `counts()`, per deck.
+ *
+ * A deck is a vault folder — `cards.deck` is set from the note's folder at extraction — so this is
+ * how "just the bio ones" becomes a session. Only decks with something waiting are listed: a deck
+ * you have fully cleared is not a choice, and showing it would only put a zero next to a name.
+ * Grouped here rather than in SQL because the rows are two small columns and PostgREST has no
+ * group-by without an RPC.
+ */
+export async function deckCounts(): Promise<DeckCounts[]> {
+  const db = supabase();
+  const { data, error } = await db.from('due_cards').select('deck, reps');
+  if (error) throw new Error(error.message);
+
+  const by = new Map<string, DeckCounts>();
+  for (const row of data ?? []) {
+    const deck = row.deck as string;
+    const entry = by.get(deck) ?? { deck, newCards: 0, dueNow: 0 };
+    if ((row.reps as number) === 0) entry.newCards += 1;
+    else entry.dueNow += 1;
+    by.set(deck, entry);
+  }
+  return [...by.values()].sort((a, b) => a.deck.localeCompare(b.deck));
 }
 
 export interface Counts {

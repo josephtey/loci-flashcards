@@ -107,6 +107,8 @@ export interface SessionProps {
    * review, because a card can take three encounters to reveal that it was never worth keeping.
    */
   mode: 'new' | 'review';
+  /** The one deck this sitting was drawn from, when it was — so the header says so. */
+  deck?: string;
   /** Resolved on the server: is there an Ollama to grade against, and which model. */
   grader: GraderStatus;
   /** Resolved on the server: is there a model to explain a card against, and which one. */
@@ -115,7 +117,7 @@ export interface SessionProps {
   autoAccept: boolean;
 }
 
-export function Review({ cards, mode, grader, explainer, autoAccept }: SessionProps) {
+export function Review({ cards, mode, deck, grader, explainer, autoAccept }: SessionProps) {
   const isNew = mode === 'new';
   const router = useRouter();
   const [idx, setIdx] = useState(0);
@@ -517,7 +519,8 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
       <main className="safe-b safe-t [--safe-b-base:2.5rem] [--safe-t-base:2.5rem] flex min-h-dvh flex-col items-center justify-center px-6">
         <p className="rise text-ink-3">
           Done — {cards.length} {isNew ? 'new card' : 'review'}
-          {cards.length === 1 ? '' : 's'}.
+          {cards.length === 1 ? '' : 's'}
+          {deck ? ` in ${deck}` : ''}.
         </p>
         <Link href="/" className="mt-8 text-sm text-ink-3 transition-colors hover:text-ink">
           Home
@@ -541,6 +544,7 @@ export function Review({ cards, mode, grader, explainer, autoAccept }: SessionPr
           <h1 className="text-lg font-light">{isNew ? 'Learn new cards' : 'Review'}</h1>
           <p className="mt-0.5 text-xs text-ink-3 tabular-nums">
             {idx + 1} of {cards.length} {isNew ? 'never seen' : 'due'}
+            {deck && <span className="text-ink-4"> · {deck}</span>}
           </p>
         </div>
 
