@@ -161,6 +161,9 @@ learning something new costs nothing you already had.
 
 ## The app
 
+To add cards from a Codex conversation, follow [Adding cards through Codex](docs/adding-cards.md).
+The workflow covers drafting, duplicate checks, saving through the app API, and verifying the live card.
+
 | | |
 |---|---|
 | `/` | today's goals, streak, a year of activity, sync |

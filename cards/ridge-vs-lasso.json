@@ -1,0 +1,8 @@
+{
+  "type": "qa",
+  "angle": "contrast",
+  "front": "How do Ridge and Lasso differ in regularization penalty and feature selection?",
+  "back": "Ridge uses L2 (λΣβⱼ²): it shrinks coefficients toward zero without encouraging exact zeros. Lasso uses L1 (λΣ|βⱼ|): it can set coefficients exactly to zero, selecting features.",
+  "cloze_text": null,
+  "context": "Memory cue: Ridge reduces; Lasso ropes features out. The intercept is usually not penalized."
+}
